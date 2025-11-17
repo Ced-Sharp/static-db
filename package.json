@@ -54,6 +54,8 @@
     "@size-limit/preset-small-lib": "^8.2.4",
     "@types/node": "^22.18.1",
     "@vitest/coverage-istanbul": "3.2.4",
+    "@vitest/ui": "3.2.4",
+    "jsdom": "^27.2.0",
     "size-limit": "^8.2.4",
     "tsdown": "^0.15.0",
     "typescript": "^5.9.2",

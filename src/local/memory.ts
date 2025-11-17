@@ -1,6 +1,10 @@
-import { LocalDatabase, LocalState, LocalSaveOptions } from "../core/interfaces.js";
-import { RemoteSnapshot } from "../core/types.js";
 import { LocalDatabaseError } from "../core/errors.js";
+import type {
+  LocalDatabase,
+  LocalSaveOptions,
+  LocalState,
+} from "../core/interfaces.js";
+import type { RemoteSnapshot } from "../core/types.js";
 
 /**
  * In-memory implementation of LocalDatabase for testing and development.
@@ -19,12 +23,13 @@ export class MemoryLocalDatabase implements LocalDatabase {
     lastSavedAt?: string;
     reason?: string;
   } = {};
+  private saveLock: Promise<void> = Promise.resolve();
 
   constructor(
     private readonly options: {
       /** Enable debug logging (default: false) */
       debug?: boolean;
-    } = {}
+    } = {},
   ) {}
 
   async init(): Promise<void> {
@@ -39,14 +44,24 @@ export class MemoryLocalDatabase implements LocalDatabase {
     });
 
     return {
-      snapshot: this.snapshot,
+      snapshot: structuredClone(this.snapshot),
       hasUnsyncedChanges: this.hasUnsyncedChanges,
     };
   }
 
-  async save(snapshot: RemoteSnapshot, options: LocalSaveOptions): Promise<void> {
+  async save(
+    snapshot: RemoteSnapshot,
+    options: LocalSaveOptions,
+  ): Promise<void> {
+    // Wait for last save to complete
+    await this.saveLock;
+
+    // Create new save lock
+    let resolveSave: null | ((v: void | PromiseLike<void>) => void) = null;
+    this.saveLock = new Promise((r) => (resolveSave = r));
+
     try {
-      this.snapshot = { ...snapshot };
+      this.snapshot = structuredClone(snapshot);
       this.hasUnsyncedChanges = !options.synced;
 
       if (options.meta) {
@@ -61,14 +76,20 @@ export class MemoryLocalDatabase implements LocalDatabase {
       this.debugLog("Saved snapshot to memory", {
         commitId: snapshot.commitId,
         synced: options.synced,
-        schemasCount: snapshot.schemas.length,
-        recordsCount: snapshot.records.length,
+        schemasCount: snapshot.schemas?.length ?? 0,
+        recordsCount: snapshot.records?.length ?? 0,
       });
+
+      // @ts-expect-error - TypeScript doesn't like the promise trick above
+      resolveSave?.();
     } catch (error) {
+      // @ts-expect-error - TypeScript doesn't like the promise trick above
+      resolveSave?.();
+
       throw new LocalDatabaseError(
         `Failed to save to memory: ${error instanceof Error ? error.message : String(error)}`,
         "SAVE_ERROR",
-        error instanceof Error ? error : undefined
+        error instanceof Error ? error : undefined,
       );
     }
   }
@@ -93,7 +114,7 @@ export class MemoryLocalDatabase implements LocalDatabase {
   _getInternalState(): {
     snapshot: RemoteSnapshot | null;
     hasUnsyncedChanges: boolean;
-    metadata: typeof this.metadata;
+    metadata: InstanceType<typeof MemoryLocalDatabase>["metadata"];
   } {
     return {
       snapshot: this.snapshot,
@@ -109,7 +130,7 @@ export class MemoryLocalDatabase implements LocalDatabase {
   _setInternalState(state: {
     snapshot?: RemoteSnapshot | null;
     hasUnsyncedChanges?: boolean;
-    metadata?: typeof this.metadata;
+    metadata?: InstanceType<typeof MemoryLocalDatabase>["metadata"];
   }): void {
     if (state.snapshot !== undefined) {
       this.snapshot = state.snapshot ? { ...state.snapshot } : null;

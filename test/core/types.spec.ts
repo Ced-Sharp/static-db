@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  type EntityRecord,
   FIELD_TYPES,
-  SchemaDef,
-  EntityRecord,
-  RemoteSnapshot,
-  isValidSchemaName,
-  isValidRecordId,
-  isSchemaDef,
   isEntityRecord,
+  isSchemaDef,
+  isValidRecordId,
+  isValidSchemaName,
+  type RemoteSnapshot,
+  type SchemaDef,
 } from "../../src/core/types";
 
 describe("Core Types", () => {
@@ -77,7 +77,9 @@ describe("Core Types", () => {
         expect(isSchemaDef({ name: "test" })).toBe(false); // missing fields
         expect(isSchemaDef({ fields: [] })).toBe(false); // missing name
         expect(isSchemaDef({ name: "", fields: [] })).toBe(false); // empty name
-        expect(isSchemaDef({ name: "test", fields: "not-an-array" })).toBe(false);
+        expect(isSchemaDef({ name: "test", fields: "not-an-array" })).toBe(
+          false,
+        );
       });
     });
 
@@ -99,8 +101,24 @@ describe("Core Types", () => {
         expect(isEntityRecord({})).toBe(false);
         expect(isEntityRecord({ id: "test" })).toBe(false); // missing schema
         expect(isEntityRecord({ schema: "test" })).toBe(false); // missing id
-        expect(isEntityRecord({ id: "", schema: "test", data: {}, createdAt: "", updatedAt: "" })).toBe(false); // empty id
-        expect(isEntityRecord({ id: "test", schema: "", data: {}, createdAt: "", updatedAt: "" })).toBe(false); // empty schema
+        expect(
+          isEntityRecord({
+            id: "",
+            schema: "test",
+            data: {},
+            createdAt: "",
+            updatedAt: "",
+          }),
+        ).toBe(false); // empty id
+        expect(
+          isEntityRecord({
+            id: "test",
+            schema: "",
+            data: {},
+            createdAt: "",
+            updatedAt: "",
+          }),
+        ).toBe(false); // empty schema
       });
     });
   });

@@ -1,14 +1,12 @@
-import { describe, expect, it, beforeEach } from "vitest";
-
+import { beforeEach, describe, expect, it } from "vitest";
+import { SchemaValidationError } from "../../src/core/errors";
+import type { EntityRecord, SchemaDef } from "../../src/core/types";
 import {
   CMSValidator,
   createValidator,
   validateRecordWithSchemas,
   validateSnapshot,
-  ValidationResult,
 } from "../../src/utils/validation";
-import { SchemaDef, EntityRecord, FIELD_TYPES } from "../../src/core/types";
-import { ValidationError, SchemaValidationError } from "../../src/core/errors";
 
 describe("CMSValidator", () => {
   let validator: CMSValidator;
@@ -32,12 +30,15 @@ describe("CMSValidator", () => {
     });
 
     it("rejects invalid schemas", () => {
+      // Using `as unknown as ...` to force invalid config
       const invalidSchema = {
         name: "",
         fields: "not-an-array",
-      } as any;
+      } as unknown as SchemaDef;
 
-      expect(() => validator.registerSchema(invalidSchema)).toThrow(SchemaValidationError);
+      expect(() => validator.registerSchema(invalidSchema)).toThrow(
+        SchemaValidationError,
+      );
     });
 
     it("registers multiple schemas", () => {
@@ -119,7 +120,9 @@ describe("CMSValidator", () => {
 
       expect(result.isValid).toBe(false);
       expect(result.errors).toHaveLength(2); // One for each duplicate
-      expect(result.errors[0].message).toContain("Duplicate field name 'title'");
+      expect(result.errors[0].message).toContain(
+        "Duplicate field name 'title'",
+      );
     });
 
     it("validates field names format", () => {
@@ -136,9 +139,13 @@ describe("CMSValidator", () => {
       const result = validator.validateSchema(schema);
 
       expect(result.isValid).toBe(false);
-      expect(result.errors.some(e => e.message.includes("123invalid"))).toBe(true);
-      expect(result.errors.some(e => e.message.includes("invalid space"))).toBe(true);
-      expect(result.warnings.some(w => w.includes("_system"))).toBe(true);
+      expect(result.errors.some((e) => e.message.includes("123invalid"))).toBe(
+        true,
+      );
+      expect(
+        result.errors.some((e) => e.message.includes("invalid space")),
+      ).toBe(true);
+      expect(result.warnings.some((w) => w.includes("_system"))).toBe(true);
     });
 
     it("validates relation field references", () => {
@@ -167,21 +174,30 @@ describe("CMSValidator", () => {
       const result = validator.validateSchema(schema);
 
       expect(result.isValid).toBe(false);
-      expect(result.errors[0].message).toContain("acceptedTypes must be an array");
+      expect(result.errors[0].message).toContain(
+        "acceptedTypes must be an array",
+      );
     });
 
     it("warns about required fields with defaults", () => {
       const schema = {
         name: "test",
         fields: [
-          { name: "title", type: "string", required: true, defaultValue: "Default Title" },
+          {
+            name: "title",
+            type: "string",
+            required: true,
+            defaultValue: "Default Title",
+          },
         ],
       } as SchemaDef;
 
       const result = validator.validateSchema(schema);
 
       expect(result.warnings).toHaveLength(1);
-      expect(result.warnings[0]).toContain("Required field 'title' has default value");
+      expect(result.warnings[0]).toContain(
+        "Required field 'title' has default value",
+      );
     });
   });
 
@@ -221,21 +237,29 @@ describe("CMSValidator", () => {
         fields: [{ name: "name", type: "string" }],
       });
 
-      const field = { name: "category", type: "relation", relationSchema: "category" };
+      const field = {
+        name: "category",
+        type: "relation",
+        relationSchema: "category",
+      };
       const result = validator.validateField(field);
 
       expect(result.isValid).toBe(true);
     });
 
     it("validates media fields", () => {
-      const field = { name: "image", type: "media", acceptedTypes: ["image/*", "video/*"] };
+      const field = {
+        name: "image",
+        type: "media",
+        acceptedTypes: ["image/*", "video/*"],
+      };
       const result = validator.validateField(field);
 
       expect(result.isValid).toBe(true);
     });
 
     it("warns about unknown field types", () => {
-      const field = { name: "custom", type: "unknown-type" } as any;
+      const field = { name: "custom", type: "unknown-type" };
       const result = validator.validateField(field);
 
       expect(result.warnings).toHaveLength(1);
@@ -301,8 +325,8 @@ describe("CMSValidator", () => {
 
       expect(result.isValid).toBe(false);
       expect(result.errors).toHaveLength(2);
-      expect(result.errors.some(e => e.field === "price")).toBe(true);
-      expect(result.errors.some(e => e.field === "createdAt")).toBe(true);
+      expect(result.errors.some((e) => e.field === "price")).toBe(true);
+      expect(result.errors.some((e) => e.field === "createdAt")).toBe(true);
     });
 
     it("detects invalid field values", () => {
@@ -322,9 +346,9 @@ describe("CMSValidator", () => {
       const result = validator.validateRecord(record);
 
       expect(result.isValid).toBe(false);
-      expect(result.errors.some(e => e.field === "title")).toBe(true);
-      expect(result.errors.some(e => e.field === "price")).toBe(true);
-      expect(result.errors.some(e => e.field === "createdAt")).toBe(true);
+      expect(result.errors.some((e) => e.field === "title")).toBe(true);
+      expect(result.errors.some((e) => e.field === "price")).toBe(true);
+      expect(result.errors.some((e) => e.field === "createdAt")).toBe(true);
     });
 
     it("detects unknown fields", () => {
@@ -365,7 +389,7 @@ describe("CMSValidator", () => {
       const result = validator.validateRecord(record);
 
       expect(result.isValid).toBe(false);
-      expect(result.errors.some(e => e.field === "createdAt")).toBe(true);
+      expect(result.errors.some((e) => e.field === "createdAt")).toBe(true);
     });
 
     it("detects invalid timestamp order", () => {
@@ -384,7 +408,9 @@ describe("CMSValidator", () => {
       const result = validator.validateRecord(record);
 
       expect(result.warnings).toHaveLength(1);
-      expect(result.warnings[0]).toContain("updatedAt timestamp is before createdAt");
+      expect(result.warnings[0]).toContain(
+        "updatedAt timestamp is before createdAt",
+      );
     });
 
     it("handles unknown schema", () => {
@@ -400,7 +426,9 @@ describe("CMSValidator", () => {
 
       expect(result.isValid).toBe(false);
       expect(result.errors[0].field).toBe("schema");
-      expect(result.errors[0].message).toContain("Unknown schema 'unknown-schema'");
+      expect(result.errors[0].message).toContain(
+        "Unknown schema 'unknown-schema'",
+      );
     });
   });
 
@@ -617,7 +645,12 @@ describe("Utility Functions", () => {
         {
           name: "product",
           fields: [
-            { name: "title", type: "string", required: true, defaultValue: "Default" }, // Warning: required with default
+            {
+              name: "title",
+              type: "string",
+              required: true,
+              defaultValue: "Default",
+            }, // Warning: required with default
           ],
         },
       ];

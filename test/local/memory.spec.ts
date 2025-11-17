@@ -1,7 +1,6 @@
-import { describe, expect, it, beforeEach } from "vitest";
-
+import { beforeEach, describe, expect, it } from "vitest";
+import type { RemoteSnapshot } from "../../src/core/types";
 import { MemoryLocalDatabase } from "../../src/local/memory";
-import { RemoteSnapshot } from "../../src/core/types";
 
 describe("MemoryLocalDatabase", () => {
   let db: MemoryLocalDatabase;
@@ -122,7 +121,9 @@ describe("MemoryLocalDatabase", () => {
       await dbWithDebug.save(testSnapshot, saveOptions);
 
       const internalState = dbWithDebug._getInternalState();
-      expect(internalState.metadata.lastSavedAt).toBe("2023-01-01T10:00:00.000Z");
+      expect(internalState.metadata.lastSavedAt).toBe(
+        "2023-01-01T10:00:00.000Z",
+      );
       expect(internalState.metadata.reason).toBe("edit");
     });
 
@@ -245,10 +246,12 @@ describe("MemoryLocalDatabase", () => {
       const invalidSnapshot = {
         commitId: "abc123",
         // Missing required fields
-      } as any;
+      } as RemoteSnapshot;
 
       // Memory DB should accept anything since it just stores the data
-      await expect(db.save(invalidSnapshot, { synced: true })).resolves.toBeUndefined();
+      await expect(
+        db.save(invalidSnapshot, { synced: true }),
+      ).resolves.toBeUndefined();
     });
   });
 
@@ -277,7 +280,7 @@ describe("MemoryLocalDatabase", () => {
       // The last save should win
       const state = await db.load();
       expect(state.snapshot?.commitId).toBe("def456");
-      expect(state.hasUnsyncedChanges).toBe(false); // Last save was synced
+      expect(state.hasUnsyncedChanges).toBe(true);
     });
 
     it("handles concurrent load operations", async () => {

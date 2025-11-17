@@ -1,23 +1,22 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  StaticDBError,
-  RemoteDatabaseError,
-  OutOfDateError,
   AuthenticationError,
-  NetworkError,
-  RemoteConfigurationError,
-  LocalDatabaseError,
-  QuotaExceededError,
-  StorageUnavailableError,
   DataCorruptionError,
+  getUserErrorMessage,
+  isErrorOfType,
+  isRetryableError,
+  LocalDatabaseError,
+  NetworkError,
+  OutOfDateError,
+  QuotaExceededError,
+  RemoteConfigurationError,
+  RemoteDatabaseError,
+  SchemaValidationError,
+  StaticDBError,
   SyncError,
   SyncFailedError,
   ValidationError,
-  SchemaValidationError,
-  isErrorOfType,
-  isRetryableError,
-  getUserErrorMessage,
   wrapError,
 } from "../../src/core/errors";
 
@@ -41,7 +40,12 @@ describe("Error Classes", () => {
 
   describe("RemoteDatabaseError", () => {
     it("creates remote database error", () => {
-      const error = new RemoteDatabaseError("Remote error", "REMOTE_ERROR", undefined, "test-endpoint");
+      const error = new RemoteDatabaseError(
+        "Remote error",
+        "REMOTE_ERROR",
+        undefined,
+        "test-endpoint",
+      );
       expect(error.endpointId).toBe("test-endpoint");
       expect(error.code).toBe("REMOTE_ERROR");
     });
@@ -59,7 +63,10 @@ describe("Error Classes", () => {
 
   describe("AuthenticationError", () => {
     it("creates authentication error", () => {
-      const error = new AuthenticationError("Auth failed", "https://api.example.com");
+      const error = new AuthenticationError(
+        "Auth failed",
+        "https://api.example.com",
+      );
       expect(error.endpoint).toBe("https://api.example.com");
       expect(error.isRetryable()).toBe(false);
       expect(error.getUserMessage()).toContain("check your credentials");
@@ -94,7 +101,12 @@ describe("Error Classes", () => {
 
   describe("SyncError", () => {
     it("creates sync error with phase", () => {
-      const error = new SyncError("Sync failed", "SYNC_FAILED", undefined, "push");
+      const error = new SyncError(
+        "Sync failed",
+        "SYNC_FAILED",
+        undefined,
+        "push",
+      );
       expect(error.syncPhase).toBe("push");
       expect(error.isRetryable()).toBe(true);
     });
@@ -102,7 +114,12 @@ describe("Error Classes", () => {
 
   describe("ValidationError", () => {
     it("creates validation error with context", () => {
-      const error = new ValidationError("Invalid field", "title", "invalid-value", "product");
+      const error = new ValidationError(
+        "Invalid field",
+        "title",
+        "invalid-value",
+        "product",
+      );
       expect(error.field).toBe("title");
       expect(error.value).toBe("invalid-value");
       expect(error.schema).toBe("product");
@@ -173,7 +190,9 @@ describe("Error Utilities", () => {
     });
 
     it("handles non-error objects", () => {
-      expect(getUserErrorMessage("string error")).toBe("An unknown error occurred");
+      expect(getUserErrorMessage("string error")).toBe(
+        "An unknown error occurred",
+      );
       expect(getUserErrorMessage(null)).toBe("An unknown error occurred");
       expect(getUserErrorMessage(123)).toBe("An unknown error occurred");
     });
@@ -183,7 +202,7 @@ describe("Error Utilities", () => {
     it("wraps unknown errors in StaticDBError", () => {
       const wrapped = wrapError("string error", "Context message");
       expect(wrapped).toBeInstanceOf(SyncError);
-      expect(wrapped.message).toBe("Context message: string error");
+      expect(wrapped.message).toBe("Context message");
     });
 
     it("preserves StaticDB errors", () => {

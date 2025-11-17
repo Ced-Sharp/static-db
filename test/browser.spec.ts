@@ -1,27 +1,20 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
-
-import {
-  VERSION,
-  LIB_INFO,
-  BROWSER_UTILS,
-  BROWSER_ERROR_HANDLING,
-} from "../src/browser";
-
 // Import core functionality
 import {
+  BROWSER_ERROR_HANDLING,
+  BROWSER_UTILS,
   CMSValidator,
-  MemoryLocalDatabase,
   DefaultSyncService,
+  MemoryLocalDatabase,
+  VERSION,
 } from "../src/browser";
 
 // Mock browser APIs for testing
 beforeAll(() => {
   // Ensure btoa exists in Node test environment
-  // biome-ignore lint/suspicious/noExplicitAny: this is fine
-  if (!(globalThis as any).btoa) {
-    // biome-ignore lint/suspicious/noExplicitAny: this is fine
-    (globalThis as any).btoa = (str: string) =>
-      Buffer.from(str, "binary").toString("base64");
+  const win = globalThis as unknown as { btoa?: (str: string) => string };
+  if (!win.btoa) {
+    win.btoa = (str: string) => Buffer.from(str, "binary").toString("base64");
   }
 
   // Mock IndexedDB
@@ -34,8 +27,8 @@ beforeAll(() => {
 
   const mockTransaction = {
     objectStore: vi.fn(() => mockObjectStore),
-    oncomplete: null as any,
-    onerror: null as any,
+    oncomplete: () => {},
+    onerror: () => {},
   };
 
   const mockDB = {
@@ -47,45 +40,30 @@ beforeAll(() => {
   };
 
   const mockOpenRequest = {
-    onsuccess: null as any,
-    onerror: null as any,
-    onupgradeneeded: null as any,
+    onsuccess: vi.fn(),
+    onerror: vi.fn(),
+    onupgradeneeded: vi.fn(),
     result: mockDB,
   };
 
-  // biome-ignore lint/suspicious/noExplicitAny: this is fine
-  (globalThis as any).indexedDB = {
-    open: vi.fn(() => mockOpenRequest),
-  };
-
-  // Mock crypto API
-  // biome-ignore lint/suspicious/noExplicitAny: this is fine
-  (globalThis as any).crypto = {
-    getRandomValues: vi.fn((array: Uint8Array) => {
-      for (let i = 0; i < array.length; i++) {
-        array[i] = Math.floor(Math.random() * 256);
-      }
-      return array;
-    }),
-    subtle: {
-      encrypt: vi.fn(),
-      decrypt: vi.fn(),
-    },
-  };
+  const indexedDBWin = globalThis as unknown as { indexedDB?: IDBFactory };
+  indexedDBWin.indexedDB = {
+    open: vi.fn(() => mockOpenRequest) as unknown as IDBFactory["open"],
+  } as IDBFactory;
 
   // Mock navigator storage API
-  // biome-ignore lint/suspicious/noExplicitAny: this is fine
-  (globalThis as any).navigator = {
+  const navigatorWin = globalThis as unknown as { navigator?: Navigator };
+  navigatorWin.navigator = {
     storage: {
       estimate: vi.fn(() =>
         Promise.resolve({
           quota: 1000000000, // 1GB
           usage: 10000000, // 10MB
-        })
+        }),
       ),
       persist: vi.fn(() => Promise.resolve(true)),
-    },
-  };
+    } as unknown as Navigator["storage"],
+  } as Navigator;
 });
 
 describe("Browser Entry Point", () => {
@@ -93,13 +71,6 @@ describe("Browser Entry Point", () => {
     it("exports VERSION constant", () => {
       expect(VERSION).toBe("1.0.0");
       expect(typeof VERSION).toBe("string");
-    });
-
-    it("exports LIB_INFO object", () => {
-      expect(LIB_INFO).toBeDefined();
-      expect(LIB_INFO.name).toBe("static-db");
-      expect(LIB_INFO.version).toBe(VERSION);
-      expect(LIB_INFO.description).toBe("Git-Backed Local-First CMS Data Layer");
     });
 
     it("exports core functionality", () => {
@@ -117,13 +88,14 @@ describe("Browser Entry Point", () => {
 
       it("returns false when IndexedDB is not available", () => {
         // Temporarily remove IndexedDB
-        const originalIndexedDB = (globalThis as any).indexedDB;
-        delete (globalThis as any).indexedDB;
+        const win = globalThis as unknown as { indexedDB?: IDBFactory };
+        const originalIndexedDB = win.indexedDB;
+        delete win.indexedDB;
 
         expect(BROWSER_UTILS.isIndexedDBAvailable()).toBe(false);
 
         // Restore IndexedDB
-        (globalThis as any).indexedDB = originalIndexedDB;
+        win.indexedDB = originalIndexedDB;
       });
     });
 
@@ -133,12 +105,13 @@ describe("Browser Entry Point", () => {
       });
 
       it("returns false when Web Crypto API is not available", () => {
-        const originalCrypto = (globalThis as any).crypto;
-        delete (globalThis as any).crypto;
+        const win = globalThis as unknown as { crypto?: Crypto };
+        const originalCrypto = win.crypto;
+        delete win.crypto;
 
         expect(BROWSER_UTILS.isCryptoAvailable()).toBe(false);
 
-        (globalThis as any).crypto = originalCrypto;
+        win.crypto = originalCrypto;
       });
     });
 
@@ -152,27 +125,29 @@ describe("Browser Entry Point", () => {
       });
 
       it("returns unavailable when storage API is not present", async () => {
-        const originalNavigator = (globalThis as any).navigator;
-        delete (globalThis as any).navigator;
+        const win = globalThis as unknown as { navigator?: Navigator };
+        const originalNavigator = win.navigator;
+        delete win.navigator;
 
         const storageInfo = await BROWSER_UTILS.getStorageInfo();
 
         expect(storageInfo.available).toBe(false);
 
-        (globalThis as any).navigator = originalNavigator;
+        win.navigator = originalNavigator;
       });
 
       it("handles storage estimate errors gracefully", async () => {
-        const originalEstimate = (globalThis as any).navigator.storage.estimate;
-        (globalThis as any).navigator.storage.estimate = vi.fn(() =>
-          Promise.reject(new Error("Storage estimate failed"))
+        const win = globalThis as unknown as { navigator: Navigator };
+        const originalEstimate = win.navigator.storage.estimate;
+        win.navigator.storage.estimate = vi.fn(() =>
+          Promise.reject(new Error("Storage estimate failed")),
         );
 
         const storageInfo = await BROWSER_UTILS.getStorageInfo();
 
         expect(storageInfo.available).toBe(false);
 
-        (globalThis as any).navigator.storage.estimate = originalEstimate;
+        win.navigator.storage.estimate = originalEstimate;
       });
     });
 
@@ -183,25 +158,27 @@ describe("Browser Entry Point", () => {
       });
 
       it("returns false when persistence API is not available", async () => {
-        const originalNavigator = (globalThis as any).navigator;
-        delete (globalThis as any).navigator;
+        const win = globalThis as unknown as { navigator?: Navigator };
+        const originalNavigator = win.navigator;
+        delete win.navigator;
 
         const result = await BROWSER_UTILS.requestPersistentStorage();
         expect(result).toBe(false);
 
-        (globalThis as any).navigator = originalNavigator;
+        win.navigator = originalNavigator;
       });
 
       it("handles persistence request failures", async () => {
-        const originalPersist = (globalThis as any).navigator.storage.persist;
-        (globalThis as any).navigator.storage.persist = vi.fn(() =>
-          Promise.reject(new Error("Persistence denied"))
+        const win = globalThis as unknown as { navigator: Navigator };
+        const originalPersist = win.navigator.storage.persist;
+        win.navigator.storage.persist = vi.fn(() =>
+          Promise.reject(new Error("Persistence denied")),
         );
 
         const result = await BROWSER_UTILS.requestPersistentStorage();
         expect(result).toBe(false);
 
-        (globalThis as any).navigator.storage.persist = originalPersist;
+        win.navigator.storage.persist = originalPersist;
       });
     });
   });
@@ -209,7 +186,10 @@ describe("Browser Entry Point", () => {
   describe("Browser Error Handling", () => {
     describe("handleIndexedDBError", () => {
       it("handles QuotaExceededError", () => {
-        const error = new DOMException("Storage quota exceeded", "QuotaExceededError");
+        const error = new DOMException(
+          "Storage quota exceeded",
+          "QuotaExceededError",
+        );
         const message = BROWSER_ERROR_HANDLING.handleIndexedDBError(error);
 
         expect(message).toContain("Storage quota exceeded");
@@ -256,7 +236,8 @@ describe("Browser Entry Point", () => {
       });
 
       it("handles non-Error objects", () => {
-        const message = BROWSER_ERROR_HANDLING.handleIndexedDBError("string error");
+        const message =
+          BROWSER_ERROR_HANDLING.handleIndexedDBError("string error");
         expect(message).toBe("Unknown error occurred");
       });
     });
@@ -270,7 +251,7 @@ describe("Browser Entry Point", () => {
           new DOMException("Aborted", "AbortError"),
         ];
 
-        recoverableErrors.forEach(error => {
+        recoverableErrors.forEach((error) => {
           expect(BROWSER_ERROR_HANDLING.isRecoverableError(error)).toBe(true);
         });
       });
@@ -282,14 +263,18 @@ describe("Browser Entry Point", () => {
           new DOMException("Not found", "NotFoundError"),
         ];
 
-        nonRecoverableErrors.forEach(error => {
+        nonRecoverableErrors.forEach((error) => {
           expect(BROWSER_ERROR_HANDLING.isRecoverableError(error)).toBe(false);
         });
       });
 
       it("handles non-DOMException errors", () => {
-        expect(BROWSER_ERROR_HANDLING.isRecoverableError(new Error("Generic error"))).toBe(false);
-        expect(BROWSER_ERROR_HANDLING.isRecoverableError("string error")).toBe(false);
+        expect(
+          BROWSER_ERROR_HANDLING.isRecoverableError(new Error("Generic error")),
+        ).toBe(false);
+        expect(BROWSER_ERROR_HANDLING.isRecoverableError("string error")).toBe(
+          false,
+        );
         expect(BROWSER_ERROR_HANDLING.isRecoverableError(null)).toBe(false);
       });
     });
@@ -355,7 +340,10 @@ describe("Browser Entry Point", () => {
 
     it("handles storage quota issues gracefully", async () => {
       // Mock quota exceeded error
-      const quotaError = new DOMException("Quota exceeded", "QuotaExceededError");
+      const quotaError = new DOMException(
+        "Quota exceeded",
+        "QuotaExceededError",
+      );
       const message = BROWSER_ERROR_HANDLING.handleIndexedDBError(quotaError);
 
       expect(message).toContain("quota exceeded");
@@ -366,37 +354,40 @@ describe("Browser Entry Point", () => {
   describe("Cross-browser Compatibility", () => {
     it("handles missing APIs gracefully", () => {
       // Test with missing IndexedDB
-      const originalIndexedDB = (globalThis as any).indexedDB;
-      delete (globalThis as any).indexedDB;
+      const indexedDBWin = globalThis as unknown as { indexedDB?: IDBFactory };
+      const originalIndexedDB = indexedDBWin.indexedDB;
+      delete indexedDBWin.indexedDB;
 
       expect(BROWSER_UTILS.isIndexedDBAvailable()).toBe(false);
 
       // Restore
-      (globalThis as any).indexedDB = originalIndexedDB;
+      indexedDBWin.indexedDB = originalIndexedDB;
 
       // Test with missing Crypto API
-      const originalCrypto = (globalThis as any).crypto;
-      delete (globalThis as any).crypto;
+      const cryptoWin = globalThis as unknown as { crypto?: Crypto };
+      const originalCrypto = cryptoWin.crypto;
+      delete cryptoWin.crypto;
 
       expect(BROWSER_UTILS.isCryptoAvailable()).toBe(false);
 
       // Restore
-      (globalThis as any).crypto = originalCrypto;
+      cryptoWin.crypto = originalCrypto;
     });
 
     it("handles partial API implementations", async () => {
       // Mock partial IndexedDB implementation
-      (globalThis as any).indexedDB = {
+      const indexedDBWin = globalThis as unknown as { indexedDB?: IDBFactory };
+      indexedDBWin.indexedDB = {
         // Missing open method
         deleteDatabase: vi.fn(),
-      };
+      } as IDBFactory;
 
       expect(BROWSER_UTILS.isIndexedDBAvailable()).toBe(false);
 
       // Restore full mock
-      (globalThis as any).indexedDB = {
+      indexedDBWin.indexedDB = {
         open: vi.fn(),
-      };
+      } as IDBFactory;
     });
   });
 

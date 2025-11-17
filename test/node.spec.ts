@@ -1,41 +1,13 @@
-import { beforeAll, describe, expect, it, vi } from "vitest";
-
-import {
-  VERSION,
-  LIB_INFO,
-} from "../src";
-
+import { describe, expect, it, vi } from "vitest";
 // Import Node.js specific functionality
 import {
   CMSValidator,
-  MemoryLocalDatabase,
   DefaultSyncService,
+  LIB_INFO,
+  MemoryLocalDatabase,
+  NodeFileLocalDatabase,
+  VERSION,
 } from "../src";
-
-// Mock Node.js crypto module for testing
-beforeAll(() => {
-  // Mock Node.js crypto.randomBytes
-  const mockCrypto = {
-    randomBytes: vi.fn((size: number) => {
-      const bytes = new Uint8Array(size);
-      for (let i = 0; i < size; i++) {
-        bytes[i] = Math.floor(Math.random() * 256);
-      }
-      return bytes;
-    }),
-  };
-
-  // biome-ignore lint/suspicious/noExplicitAny: this is fine
-  (globalThis as any).require = vi.fn((moduleName: string) => {
-    if (moduleName === "node:crypto") {
-      return mockCrypto;
-    }
-    return {};
-  });
-
-  // Mock fetch for Node.js environment
-  global.fetch = vi.fn();
-});
 
 describe("Node.js Entry Point", () => {
   describe("Exports", () => {
@@ -48,7 +20,9 @@ describe("Node.js Entry Point", () => {
       expect(LIB_INFO).toBeDefined();
       expect(LIB_INFO.name).toBe("static-db");
       expect(LIB_INFO.version).toBe(VERSION);
-      expect(LIB_INFO.description).toBe("Git-Backed Local-First CMS Data Layer");
+      expect(LIB_INFO.description).toBe(
+        "Git-Backed Local-First CMS Data Layer",
+      );
       expect(LIB_INFO.repository).toContain("github.com");
     });
 
@@ -61,13 +35,6 @@ describe("Node.js Entry Point", () => {
     it("exports all required modules", async () => {
       const moduleExports = await import("../src");
 
-      // Check core types and interfaces are exported
-      expect(moduleExports.SchemaName).toBeDefined();
-      expect(moduleExports.RecordId).toBeDefined();
-      expect(moduleExports.RemoteDatabase).toBeDefined();
-      expect(moduleExports.LocalDatabase).toBeDefined();
-      expect(moduleExports.SyncService).toBeDefined();
-
       // Check error types are exported
       expect(moduleExports.StaticDBError).toBeDefined();
       expect(moduleExports.RemoteDatabaseError).toBeDefined();
@@ -76,6 +43,7 @@ describe("Node.js Entry Point", () => {
 
       // Check implementations are exported
       expect(moduleExports.MemoryLocalDatabase).toBeDefined();
+      expect(moduleExports.NodeFileLocalDatabase).toBeDefined();
       expect(moduleExports.CMSValidator).toBeDefined();
     });
   });
@@ -133,6 +101,14 @@ describe("Node.js Entry Point", () => {
       return expect(db.init()).resolves.toBeUndefined();
     });
 
+    it("creates file database instance in Node.js context", () => {
+      const db = new NodeFileLocalDatabase({ debug: true });
+      expect(db).toBeDefined();
+
+      // Should be able to initialize
+      return expect(db.init()).resolves.toBeUndefined();
+    });
+
     it("handles Node.js-specific error scenarios", () => {
       // Test that Node.js error handling works
       const nodeError = new Error("Node.js error");
@@ -165,14 +141,16 @@ describe("Node.js Entry Point", () => {
       // Create a large snapshot
       const largeSnapshot = {
         commitId: "large-snapshot",
-        schemas: [{
-          name: "product",
-          fields: [
-            { name: "title", type: "string", required: true },
-            { name: "price", type: "number", required: true },
-            { name: "description", type: "string", required: false },
-          ],
-        }],
+        schemas: [
+          {
+            name: "product",
+            fields: [
+              { name: "title", type: "string", required: true },
+              { name: "price", type: "number", required: true },
+              { name: "description", type: "string", required: false },
+            ],
+          },
+        ],
         records: Array.from({ length: 1000 }, (_, i) => ({
           id: `product-${i}`,
           schema: "product",
@@ -209,13 +187,15 @@ describe("Node.js Entry Point", () => {
         const snapshot = {
           commitId: `snapshot-${i}`,
           schemas: [],
-          records: [{
-            id: `record-${i}`,
-            schema: "test",
-            data: { index: i },
-            createdAt: "2023-01-01T00:00:00.000Z",
-            updatedAt: "2023-01-01T00:00:00.000Z",
-          }],
+          records: [
+            {
+              id: `record-${i}`,
+              schema: "test",
+              data: { index: i },
+              createdAt: "2023-01-01T00:00:00.000Z",
+              updatedAt: "2023-01-01T00:00:00.000Z",
+            },
+          ],
         };
         await db.save(snapshot, { synced: true });
       }
@@ -231,7 +211,7 @@ describe("Node.js Entry Point", () => {
   describe("File System Integration", () => {
     it("handles file system paths correctly", () => {
       // Test that paths work correctly in Node.js environment
-      const path = require("path");
+      const path = require("node:path");
       expect(typeof path).toBeDefined();
       expect(typeof path.join).toBe("function");
 
@@ -330,23 +310,26 @@ describe("Node.js Entry Point", () => {
           {
             commitId: `concurrent-${i}`,
             schemas: [],
-            records: [{
-              id: `record-${i}`,
-              schema: "test",
-              data: { index: i },
-              createdAt: "2023-01-01T00:00:00.000Z",
-              updatedAt: "2023-01-01T00:00:00.000Z",
-            }],
+            records: [
+              {
+                id: `record-${i}`,
+                schema: "test",
+                data: { index: i },
+                createdAt: "2023-01-01T00:00:00.000Z",
+                updatedAt: "2023-01-01T00:00:00.000Z",
+              },
+            ],
           },
-          { synced: true }
-        )
+          { synced: true },
+        ),
       );
 
       // Should complete all operations without errors
-      await expect(Promise.all(operations)).resolves.toBeUndefined();
+      await expect(Promise.all(operations)).resolves.not.toThrow();
 
+      // Should match last save operation
       const state = await db.load();
-      expect(state.snapshot).toBeDefined();
+      expect(state.snapshot).toMatchObject(operations[operations.length - 1]);
     });
 
     it("manages async operations efficiently", async () => {
@@ -407,7 +390,7 @@ describe("Node.js Entry Point", () => {
       expect(typeof require).toBeDefined();
 
       try {
-        const stream = require("stream");
+        const stream = require("node:stream");
         expect(typeof stream).toBeDefined();
       } catch {
         // Streams might not be available in this context

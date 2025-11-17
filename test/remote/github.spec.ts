@@ -1,8 +1,15 @@
-import { describe, expect, it, beforeEach, vi } from "vitest";
-
-import { GitHubRemoteDatabase, GitHubRemoteDatabaseOptions } from "../../src/remote/github";
-import { RemoteSnapshot } from "../../src/core/types";
-import { OutOfDateError, AuthenticationError, RemoteConfigurationError, NetworkError } from "../../src/core/errors";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  AuthenticationError,
+  NetworkError,
+  OutOfDateError,
+  RemoteConfigurationError,
+} from "../../src/core/errors";
+import type { RemoteSnapshot } from "../../src/core/types";
+import {
+  GitHubRemoteDatabase,
+  type GitHubRemoteDatabaseOptions,
+} from "../../src/remote/github";
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -31,9 +38,22 @@ describe("GitHubRemoteDatabase", () => {
     });
 
     it("throws error for missing required options", () => {
-      expect(() => new GitHubRemoteDatabase({} as any)).toThrow(RemoteConfigurationError);
-      expect(() => new GitHubRemoteDatabase({ owner: "test" } as any)).toThrow(RemoteConfigurationError);
-      expect(() => new GitHubRemoteDatabase({ owner: "test", repo: "test" } as any)).toThrow(RemoteConfigurationError);
+      expect(
+        () => new GitHubRemoteDatabase({} as GitHubRemoteDatabaseOptions),
+      ).toThrow(RemoteConfigurationError);
+      expect(
+        () =>
+          new GitHubRemoteDatabase({
+            owner: "test",
+          } as GitHubRemoteDatabaseOptions),
+      ).toThrow(RemoteConfigurationError);
+      expect(
+        () =>
+          new GitHubRemoteDatabase({
+            owner: "test",
+            repo: "test",
+          } as GitHubRemoteDatabaseOptions),
+      ).toThrow(RemoteConfigurationError);
     });
 
     it("uses default values for optional options", () => {
@@ -60,10 +80,10 @@ describe("GitHubRemoteDatabase", () => {
         expect.objectContaining({
           method: "GET",
           headers: expect.objectContaining({
-            "Authorization": "token test-token",
+            Authorization: "token test-token",
             "User-Agent": "static-db",
           }),
-        })
+        }),
       );
     });
 
@@ -158,7 +178,7 @@ describe("GitHubRemoteDatabase", () => {
                   { name: "title", type: "string", required: true },
                   { name: "price", type: "number", required: true },
                 ],
-              })
+              }),
             ).toString("base64"),
           }),
         })
@@ -169,7 +189,7 @@ describe("GitHubRemoteDatabase", () => {
               JSON.stringify({
                 name: "category",
                 fields: [{ name: "name", type: "string", required: true }],
-              })
+              }),
             ).toString("base64"),
           }),
         })
@@ -191,9 +211,7 @@ describe("GitHubRemoteDatabase", () => {
         })
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => [
-            { name: "cat-1.json", type: "file" },
-          ],
+          json: async () => [{ name: "cat-1.json", type: "file" }],
         })
         // Mock record file requests
         .mockResolvedValueOnce({
@@ -206,7 +224,7 @@ describe("GitHubRemoteDatabase", () => {
                 data: { title: "Test Product 1", price: 29.99 },
                 createdAt: "2023-01-01T00:00:00.000Z",
                 updatedAt: "2023-01-01T00:00:00.000Z",
-              })
+              }),
             ).toString("base64"),
           }),
         })
@@ -220,7 +238,7 @@ describe("GitHubRemoteDatabase", () => {
                 data: { title: "Test Product 2", price: 39.99 },
                 createdAt: "2023-01-01T00:00:00.000Z",
                 updatedAt: "2023-01-01T00:00:00.000Z",
-              })
+              }),
             ).toString("base64"),
           }),
         })
@@ -234,7 +252,7 @@ describe("GitHubRemoteDatabase", () => {
                 data: { name: "Test Category" },
                 createdAt: "2023-01-01T00:00:00.000Z",
                 updatedAt: "2023-01-01T00:00:00.000Z",
-              })
+              }),
             ).toString("base64"),
           }),
         });
@@ -309,9 +327,7 @@ describe("GitHubRemoteDatabase", () => {
         })
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => [
-            { name: "invalid.json", type: "file" },
-          ],
+          json: async () => [{ name: "invalid.json", type: "file" }],
         })
         .mockResolvedValueOnce({
           ok: true,
@@ -404,17 +420,20 @@ describe("GitHubRemoteDatabase", () => {
           }),
         });
 
-      await expect(db.pushSnapshot("base123", testSnapshot)).rejects.toThrow(OutOfDateError);
+      await expect(db.pushSnapshot("base123", testSnapshot)).rejects.toThrow(
+        OutOfDateError,
+      );
     });
 
     it("validates snapshot before pushing", async () => {
+      // Using 'as unknown' since we are forcing an invalid value
       const invalidSnapshot = {
         schemas: "not-an-array",
         records: [],
-      } as any;
+      } as unknown as Omit<RemoteSnapshot, "commitId">;
 
       await expect(db.pushSnapshot("base123", invalidSnapshot)).rejects.toThrow(
-        "Invalid snapshot: schemas must be an array"
+        "Invalid snapshot: schemas must be an array",
       );
     });
 
@@ -462,8 +481,8 @@ describe("GitHubRemoteDatabase", () => {
         ],
       };
 
-      // Should not throw for valid data
-      expect(() => (db as any).validateSnapshot(validSnapshot)).not.toThrow();
+      // @ts-expect-error - Using private method
+      expect(() => db.validateSnapshot(validSnapshot)).not.toThrow();
     });
 
     it("rejects invalid schema structure", () => {
@@ -477,8 +496,9 @@ describe("GitHubRemoteDatabase", () => {
         records: [],
       };
 
-      expect(() => (db as any).validateSnapshot(invalidSnapshot)).toThrow(
-        "Invalid schema: name is required and must be a string"
+      // @ts-expect-error - Private method
+      expect(() => db.validateSnapshot(invalidSnapshot)).toThrow(
+        "Invalid schema: name is required and must be a string",
       );
     });
 
@@ -501,8 +521,9 @@ describe("GitHubRemoteDatabase", () => {
         ],
       };
 
-      expect(() => (db as any).validateSnapshot(invalidSnapshot)).toThrow(
-        "Invalid record: id is required and must be a string"
+      // @ts-expect-error - Private method
+      expect(() => db.validateSnapshot(invalidSnapshot)).toThrow(
+        "Invalid record: id is required and must be a string",
       );
     });
   });

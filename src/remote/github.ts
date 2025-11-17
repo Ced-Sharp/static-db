@@ -1,7 +1,12 @@
+import {
+  AuthenticationError,
+  NetworkError,
+  RemoteConfigurationError,
+  RemoteDatabaseError,
+} from "../core/errors.js";
+import type { RemoteDatabaseInitOptions } from "../core/interfaces.js";
+import type { RemoteSnapshot } from "../core/types.js";
 import { BaseRemoteDatabase } from "./base.js";
-import { RemoteSnapshot } from "../core/types.js";
-import { RemoteDatabaseInitOptions } from "../core/interfaces.js";
-import { AuthenticationError, NetworkError, RemoteConfigurationError } from "../core/errors.js";
 
 /**
  * Configuration options specific to GitHub RemoteDatabase implementation.
@@ -52,7 +57,9 @@ export interface GitHubRemoteDatabaseOptions extends RemoteDatabaseInitOptions {
  * Each sync operation creates a new commit with the updated files.
  */
 export class GitHubRemoteDatabase extends BaseRemoteDatabase {
-  private readonly githubOptions: Required<Omit<GitHubRemoteDatabaseOptions, "label" | "endpointId">>;
+  private readonly githubOptions: Required<
+    Omit<GitHubRemoteDatabaseOptions, "label" | "endpointId">
+  >;
   private apiBaseUrl: string;
 
   constructor(options: GitHubRemoteDatabaseOptions) {
@@ -60,7 +67,9 @@ export class GitHubRemoteDatabase extends BaseRemoteDatabase {
 
     // Validate required options
     if (!options.owner || !options.repo || !options.token) {
-      throw new RemoteConfigurationError("GitHub owner, repo, and token are required");
+      throw new RemoteConfigurationError(
+        "GitHub owner, repo, and token are required",
+      );
     }
 
     this.githubOptions = {
@@ -81,7 +90,7 @@ export class GitHubRemoteDatabase extends BaseRemoteDatabase {
     this.apiBaseUrl = this.githubOptions.apiBaseUrl;
   }
 
-  protected async doInit(options: RemoteDatabaseInitOptions): Promise<void> {
+  protected async doInit(): Promise<void> {
     // Validate connection and authentication
     try {
       await this.ping();
@@ -169,14 +178,19 @@ export class GitHubRemoteDatabase extends BaseRemoteDatabase {
 
   async ping(): Promise<void> {
     try {
-      const response = await this.apiRequest("GET", `/repos/${this.githubOptions.owner}/${this.githubOptions.repo}`);
+      const response = await this.apiRequest(
+        "GET",
+        `/repos/${this.githubOptions.owner}/${this.githubOptions.repo}`,
+      );
 
       if (!response.ok) {
         if (response.status === 401) {
           throw new AuthenticationError("Invalid GitHub token");
         }
         if (response.status === 404) {
-          throw new RemoteConfigurationError(`Repository ${this.githubOptions.owner}/${this.githubOptions.repo} not found`);
+          throw new RemoteConfigurationError(
+            `Repository ${this.githubOptions.owner}/${this.githubOptions.repo} not found`,
+          );
         }
         throw new NetworkError(`GitHub API returned ${response.status}`);
       }
@@ -189,20 +203,26 @@ export class GitHubRemoteDatabase extends BaseRemoteDatabase {
   }
 
   private async getHeadCommitSha(): Promise<string> {
-    const response = await this.apiRequest("GET", `/repos/${this.githubOptions.owner}/${this.githubOptions.repo}/git/ref/heads/${this.githubOptions.branch}`);
+    const response = await this.apiRequest(
+      "GET",
+      `/repos/${this.githubOptions.owner}/${this.githubOptions.repo}/git/ref/heads/${this.githubOptions.branch}`,
+    );
 
     if (!response.ok) {
       throw new NetworkError(`Failed to get head commit: ${response.status}`);
     }
 
-    const ref = await response.json() as { object: { sha: string } };
+    const ref = (await response.json()) as { object: { sha: string } };
     return ref.object.sha;
   }
 
-  private async fetchSchemas(): Promise<any[]> {
+  private async fetchSchemas(): Promise<Record<string, unknown>[]> {
     try {
-      const schemas: any[] = [];
-      const response = await this.apiRequest("GET", `/repos/${this.githubOptions.owner}/${this.githubOptions.repo}/contents/${this.githubOptions.schemasDir}?ref=${this.githubOptions.branch}`);
+      const schemas: Record<string, unknown>[] = [];
+      const response = await this.apiRequest(
+        "GET",
+        `/repos/${this.githubOptions.owner}/${this.githubOptions.repo}/contents/${this.githubOptions.schemasDir}?ref=${this.githubOptions.branch}`,
+      );
 
       if (!response.ok) {
         // If schemas directory doesn't exist, return empty array
@@ -212,14 +232,22 @@ export class GitHubRemoteDatabase extends BaseRemoteDatabase {
         throw new NetworkError(`Failed to fetch schemas: ${response.status}`);
       }
 
-      const files = await response.json() as Array<{ name: string; type: string }>;
+      const files = (await response.json()) as Array<{
+        name: string;
+        type: string;
+      }>;
 
       for (const file of files) {
         if (file.type === "file" && file.name.endsWith(".json")) {
-          const fileResponse = await this.apiRequest("GET", `/repos/${this.githubOptions.owner}/${this.githubOptions.repo}/contents/${this.githubOptions.schemasDir}/${file.name}?ref=${this.githubOptions.branch}`);
+          const fileResponse = await this.apiRequest(
+            "GET",
+            `/repos/${this.githubOptions.owner}/${this.githubOptions.repo}/contents/${this.githubOptions.schemasDir}/${file.name}?ref=${this.githubOptions.branch}`,
+          );
 
           if (fileResponse.ok) {
-            const fileContent = await fileResponse.json() as { content: string };
+            const fileContent = (await fileResponse.json()) as {
+              content: string;
+            };
             const content = atob(fileContent.content);
             const schema = JSON.parse(content);
             schemas.push(schema);
@@ -234,10 +262,13 @@ export class GitHubRemoteDatabase extends BaseRemoteDatabase {
     }
   }
 
-  private async fetchRecords(): Promise<any[]> {
+  private async fetchRecords(): Promise<Record<string, unknown>[]> {
     try {
-      const records: any[] = [];
-      const response = await this.apiRequest("GET", `/repos/${this.githubOptions.owner}/${this.githubOptions.repo}/contents/${this.githubOptions.contentDir}?ref=${this.githubOptions.branch}`);
+      const records: Record<string, unknown>[] = [];
+      const response = await this.apiRequest(
+        "GET",
+        `/repos/${this.githubOptions.owner}/${this.githubOptions.repo}/contents/${this.githubOptions.contentDir}?ref=${this.githubOptions.branch}`,
+      );
 
       if (!response.ok) {
         // If content directory doesn't exist, return empty array
@@ -247,7 +278,11 @@ export class GitHubRemoteDatabase extends BaseRemoteDatabase {
         throw new NetworkError(`Failed to fetch records: ${response.status}`);
       }
 
-      const items = await response.json() as Array<{ name: string; type: string; path: string }>();
+      const items = (await response.json()) as Array<{
+        name: string;
+        type: string;
+        path: string;
+      }>;
 
       // Recursively fetch all JSON files
       for (const item of items) {
@@ -255,10 +290,15 @@ export class GitHubRemoteDatabase extends BaseRemoteDatabase {
           const dirRecords = await this.fetchRecordsFromDirectory(item.path);
           records.push(...dirRecords);
         } else if (item.type === "file" && item.name.endsWith(".json")) {
-          const fileResponse = await this.apiRequest("GET", `/repos/${this.githubOptions.owner}/${this.githubOptions.repo}/contents/${item.path}?ref=${this.githubOptions.branch}`);
+          const fileResponse = await this.apiRequest(
+            "GET",
+            `/repos/${this.githubOptions.owner}/${this.githubOptions.repo}/contents/${item.path}?ref=${this.githubOptions.branch}`,
+          );
 
           if (fileResponse.ok) {
-            const fileContent = await fileResponse.json() as { content: string };
+            const fileContent = (await fileResponse.json()) as {
+              content: string;
+            };
             const content = atob(fileContent.content);
             const record = JSON.parse(content);
             records.push(record);
@@ -273,22 +313,36 @@ export class GitHubRemoteDatabase extends BaseRemoteDatabase {
     }
   }
 
-  private async fetchRecordsFromDirectory(path: string): Promise<any[]> {
-    const records: any[] = [];
-    const response = await this.apiRequest("GET", `/repos/${this.githubOptions.owner}/${this.githubOptions.repo}/contents/${path}?ref=${this.githubOptions.branch}`);
+  private async fetchRecordsFromDirectory(
+    path: string,
+  ): Promise<Record<string, unknown>[]> {
+    const records: Record<string, unknown>[] = [];
+    const response = await this.apiRequest(
+      "GET",
+      `/repos/${this.githubOptions.owner}/${this.githubOptions.repo}/contents/${path}?ref=${this.githubOptions.branch}`,
+    );
 
     if (!response.ok) {
       return records;
     }
 
-    const items = await response.json() as Array<{ name: string; type: string; path: string }>();
+    const items = (await response.json()) as Array<{
+      name: string;
+      type: string;
+      path: string;
+    }>;
 
     for (const item of items) {
       if (item.type === "file" && item.name.endsWith(".json")) {
-        const fileResponse = await this.apiRequest("GET", `/repos/${this.githubOptions.owner}/${this.githubOptions.repo}/contents/${item.path}?ref=${this.githubOptions.branch}`);
+        const fileResponse = await this.apiRequest(
+          "GET",
+          `/repos/${this.githubOptions.owner}/${this.githubOptions.repo}/contents/${item.path}?ref=${this.githubOptions.branch}`,
+        );
 
         if (fileResponse.ok) {
-          const fileContent = await fileResponse.json() as { content: string };
+          const fileContent = (await fileResponse.json()) as {
+            content: string;
+          };
           const content = atob(fileContent.content);
           const record = JSON.parse(content);
           records.push(record);
@@ -299,8 +353,17 @@ export class GitHubRemoteDatabase extends BaseRemoteDatabase {
     return records;
   }
 
-  private async createTreeItems(snapshot: Omit<RemoteSnapshot, "commitId">): Promise<Array<{ path: string; mode: "100644"; type: "blob"; content: string }>> {
-    const treeItems: Array<{ path: string; mode: "100644"; type: "blob"; content: string }> = [];
+  private async createTreeItems(
+    snapshot: Omit<RemoteSnapshot, "commitId">,
+  ): Promise<
+    Array<{ path: string; mode: "100644"; type: "blob"; content: string }>
+  > {
+    const treeItems: Array<{
+      path: string;
+      mode: "100644";
+      type: "blob";
+      content: string;
+    }> = [];
 
     // Add schema files
     for (const schema of snapshot.schemas) {
@@ -325,49 +388,77 @@ export class GitHubRemoteDatabase extends BaseRemoteDatabase {
     return treeItems;
   }
 
-  private async createGitTree(treeItems: Array<{ path: string; mode: "100644"; type: "blob"; content: string }>, baseTree: string): Promise<{ sha: string }> {
-    const response = await this.apiRequest("POST", `/repos/${this.githubOptions.owner}/${this.githubOptions.repo}/git/trees`, {
-      base_tree: baseTree,
-      tree: treeItems,
-    });
+  private async createGitTree(
+    treeItems: Array<{
+      path: string;
+      mode: "100644";
+      type: "blob";
+      content: string;
+    }>,
+    baseTree: string,
+  ): Promise<{ sha: string }> {
+    const response = await this.apiRequest(
+      "POST",
+      `/repos/${this.githubOptions.owner}/${this.githubOptions.repo}/git/trees`,
+      {
+        base_tree: baseTree,
+        tree: treeItems,
+      },
+    );
 
     if (!response.ok) {
       throw new NetworkError(`Failed to create git tree: ${response.status}`);
     }
 
-    return await response.json() as { sha: string };
+    return (await response.json()) as { sha: string };
   }
 
-  private async createCommit(message: string, tree: string, parents: string[]): Promise<{ sha: string }> {
-    const response = await this.apiRequest("POST", `/repos/${this.githubOptions.owner}/${this.githubOptions.repo}/git/commits`, {
-      message,
-      tree,
-      parents,
-    });
+  private async createCommit(
+    message: string,
+    tree: string,
+    parents: string[],
+  ): Promise<{ sha: string }> {
+    const response = await this.apiRequest(
+      "POST",
+      `/repos/${this.githubOptions.owner}/${this.githubOptions.repo}/git/commits`,
+      {
+        message,
+        tree,
+        parents,
+      },
+    );
 
     if (!response.ok) {
       throw new NetworkError(`Failed to create commit: ${response.status}`);
     }
 
-    return await response.json() as { sha: string };
+    return (await response.json()) as { sha: string };
   }
 
   private async updateReference(branch: string, sha: string): Promise<void> {
-    const response = await this.apiRequest("PATCH", `/repos/${this.githubOptions.owner}/${this.githubOptions.repo}/git/refs/heads/${branch}`, {
-      sha,
-    });
+    const response = await this.apiRequest(
+      "PATCH",
+      `/repos/${this.githubOptions.owner}/${this.githubOptions.repo}/git/refs/heads/${branch}`,
+      {
+        sha,
+      },
+    );
 
     if (!response.ok) {
       throw new NetworkError(`Failed to update reference: ${response.status}`);
     }
   }
 
-  private async apiRequest(method: string, path: string, body?: unknown): Promise<Response> {
+  private async apiRequest(
+    method: string,
+    path: string,
+    body?: unknown,
+  ): Promise<Response> {
     const url = `${this.apiBaseUrl}${path}`;
     const headers: HeadersInit = {
-      "Accept": "application/vnd.github.v3+json",
+      Accept: "application/vnd.github.v3+json",
       "User-Agent": "static-db",
-      "Authorization": `token ${this.githubOptions.token}`,
+      Authorization: `token ${this.githubOptions.token}`,
     };
 
     if (body) {

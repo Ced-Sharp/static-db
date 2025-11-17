@@ -1,10 +1,9 @@
-import { describe, expect, it, beforeEach, vi } from "vitest";
-
-import { DefaultSyncService } from "../../src/sync/service";
-import { RemoteDatabase, LocalDatabase } from "../../src/core/interfaces";
-import { RemoteSnapshot } from "../../src/core/types";
-import { OutOfDateError, SyncError, NetworkError } from "../../src/core/errors";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NetworkError, OutOfDateError, SyncError } from "../../src/core/errors";
+import type { LocalDatabase, RemoteDatabase } from "../../src/core/interfaces";
+import type { RemoteSnapshot } from "../../src/core/types";
 import { MemoryLocalDatabase } from "../../src/local/memory";
+import { DefaultSyncService } from "../../src/sync/service";
 
 // Mock implementations for testing
 class MockRemoteDatabase implements RemoteDatabase {
@@ -38,7 +37,11 @@ class MockRemoteDatabase implements RemoteDatabase {
     newSnapshot: Omit<RemoteSnapshot, "commitId">,
   ): Promise<{ newCommitId: string }> {
     if (baseCommitId !== this.currentCommitId) {
-      throw new OutOfDateError("Remote advanced", baseCommitId, this.currentCommitId);
+      throw new OutOfDateError(
+        "Remote advanced",
+        baseCommitId,
+        this.currentCommitId,
+      );
     }
 
     this.currentCommitId = `commit${Date.now()}`;
@@ -70,7 +73,10 @@ class MockRemoteDatabase implements RemoteDatabase {
     this.snapshots.set(this.currentCommitId, snapshot);
   }
 
-  setPushError(shouldError: boolean, errorType: "OutOfDate" | "Network" = "Network"): void {
+  setPushError(
+    shouldError: boolean,
+    errorType: "OutOfDate" | "Network" = "Network",
+  ): void {
     if (!shouldError) {
       this.pushSnapshot = this.originalPushSnapshot.bind(this);
       return;
@@ -180,14 +186,19 @@ describe("DefaultSyncService", () => {
     });
 
     it("handles initialization errors", async () => {
+      // Using `as unknown as ...` to force invalid config
       const failingRemote = {
         init: async () => {
           throw new Error("Remote init failed");
         },
-        fetchSnapshot: async () => ({ commitId: "test", schemas: [], records: [] } as RemoteSnapshot),
-      } as any;
+        fetchSnapshot: async () =>
+          ({ commitId: "test", schemas: [], records: [] }) as RemoteSnapshot,
+      } as unknown as RemoteDatabase;
 
-      const failingSync = new DefaultSyncService({ remote: failingRemote, local });
+      const failingSync = new DefaultSyncService({
+        remote: failingRemote,
+        local,
+      });
 
       await expect(failingSync.loadInitial()).rejects.toThrow(SyncError);
     });
@@ -364,15 +375,20 @@ describe("DefaultSyncService", () => {
     });
 
     it("returns false when remote ping fails", async () => {
+      // Using `as unknown as ...` to force invalid config
       const failingRemote = {
         init: async () => {},
         ping: async () => {
           throw new NetworkError("Remote unreachable");
         },
-        fetchSnapshot: async () => ({ commitId: "test", schemas: [], records: [] } as RemoteSnapshot),
-      } as any;
+        fetchSnapshot: async () =>
+          ({ commitId: "test", schemas: [], records: [] }) as RemoteSnapshot,
+      } as unknown as RemoteDatabase;
 
-      const failingSync = new DefaultSyncService({ remote: failingRemote, local });
+      const failingSync = new DefaultSyncService({
+        remote: failingRemote,
+        local,
+      });
 
       const canSync = await failingSync.canSync({
         commitId: "initial123",
@@ -384,15 +400,19 @@ describe("DefaultSyncService", () => {
     });
 
     it("returns false when local loading fails", async () => {
+      // Using `as unknown as ...` to force invalid config
       const failingLocal = {
         init: async () => {
           throw new Error("Local storage error");
         },
         load: async () => ({ snapshot: null, hasUnsyncedChanges: false }),
         save: async () => {},
-      } as any;
+      } as unknown as LocalDatabase;
 
-      const failingSync = new DefaultSyncService({ remote, local: failingLocal });
+      const failingSync = new DefaultSyncService({
+        remote,
+        local: failingLocal,
+      });
 
       const canSync = await failingSync.canSync({
         commitId: "initial123",
@@ -435,8 +455,7 @@ describe("DefaultSyncService", () => {
       let attemptCount = 0;
       remote.setPushError(true, "OutOfDate");
 
-      const originalPush = remote.pushSnapshot.bind(remote);
-      remote.pushSnapshot = async (...args) => {
+      remote.pushSnapshot = async () => {
         attemptCount++;
         throw new OutOfDateError("Permanent out of date");
       };
@@ -490,15 +509,20 @@ describe("DefaultSyncService", () => {
     });
 
     it("handles destroy errors", async () => {
+      // Using `as unknown as ...` to force invalid config
       const failingRemote = {
         init: async () => {},
-        fetchSnapshot: async () => ({ commitId: "test", schemas: [], records: [] } as RemoteSnapshot),
+        fetchSnapshot: async () =>
+          ({ commitId: "test", schemas: [], records: [] }) as RemoteSnapshot,
         destroy: async () => {
           throw new Error("Remote destroy failed");
         },
-      } as any;
+      } as unknown as RemoteDatabase;
 
-      const failingSync = new DefaultSyncService({ remote: failingRemote, local });
+      const failingSync = new DefaultSyncService({
+        remote: failingRemote,
+        local,
+      });
 
       await expect(failingSync.destroy()).rejects.toThrow(SyncError);
     });
@@ -506,27 +530,35 @@ describe("DefaultSyncService", () => {
 
   describe("Error Handling", () => {
     it("wraps errors in SyncError", async () => {
+      // Using `as unknown as ...` to force invalid config
       const failingRemote = {
         init: async () => {},
         fetchSnapshot: async () => {
           throw new Error("Generic error");
         },
-      } as any;
+      } as unknown as RemoteDatabase;
 
-      const failingSync = new DefaultSyncService({ remote: failingRemote, local });
+      const failingSync = new DefaultSyncService({
+        remote: failingRemote,
+        local,
+      });
 
       await expect(failingSync.loadInitial()).rejects.toThrow(SyncError);
     });
 
     it("preserves error phase information", async () => {
+      // Using `as unknown as ...` to force invalid config
       const failingRemote = {
         init: async () => {},
         fetchSnapshot: async () => {
           throw new Error("Fetch error");
         },
-      } as any;
+      } as unknown as RemoteDatabase;
 
-      const failingSync = new DefaultSyncService({ remote: failingRemote, local });
+      const failingSync = new DefaultSyncService({
+        remote: failingRemote,
+        local,
+      });
 
       try {
         await failingSync.sync({ commitId: "test", schemas: [], records: [] });

@@ -4,18 +4,16 @@
  * Node.js entry point with full API access including Node-specific functionality.
  */
 
+export * from "./core/errors.js";
+export * from "./core/interfaces.js";
 // Core types and interfaces
 export * from "./core/types.js";
-export * from "./core/interfaces.js";
-export * from "./core/errors.js";
-
+// Local database implementations (Node.js compatible)
+export * from "./local/memory.js";
+export * from "./local/node-file.js";
 // Remote database implementations
 export * from "./remote/base.js";
 export * from "./remote/github.js";
-
-// Local database implementations
-export * from "./local/indexeddb.js";
-export * from "./local/memory.js";
 
 // Sync service
 export * from "./sync/service.js";

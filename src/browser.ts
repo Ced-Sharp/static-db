@@ -5,18 +5,16 @@
  * Excludes Node-specific functionality and includes browser-optimized implementations.
  */
 
+export * from "./core/errors.js";
+export * from "./core/interfaces.js";
 // Core types and interfaces
 export * from "./core/types.js";
-export * from "./core/interfaces.js";
-export * from "./core/errors.js";
-
-// Remote database implementations
-export * from "./remote/base.js";
-export * from "./remote/github.js";
-
 // Local database implementations (browser-focused)
 export * from "./local/indexeddb.js";
 export * from "./local/memory.js";
+// Remote database implementations
+export * from "./remote/base.js";
+export * from "./remote/github.js";
 
 // Sync service
 export * from "./sync/service.js";
@@ -50,7 +48,11 @@ export const BROWSER_UTILS = {
   /**
    * Get browser storage information if available.
    */
-  async getStorageInfo(): Promise<{ quota?: number; usage?: number; available?: boolean }> {
+  async getStorageInfo(): Promise<{
+    quota?: number;
+    usage?: number;
+    available?: boolean;
+  }> {
     if ("storage" in navigator && "estimate" in navigator.storage) {
       try {
         const estimate = await navigator.storage.estimate();

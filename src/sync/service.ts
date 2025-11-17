@@ -1,6 +1,11 @@
-import { SyncService, SyncResult, RemoteDatabase, LocalDatabase } from "../core/interfaces.js";
-import { RemoteSnapshot } from "../core/types.js";
-import { SyncError, OutOfDateError, wrapError, isErrorOfType } from "../core/errors.js";
+import { isErrorOfType, OutOfDateError, SyncError } from "../core/errors.js";
+import type {
+  LocalDatabase,
+  RemoteDatabase,
+  SyncResult,
+  SyncService,
+} from "../core/interfaces.js";
+import type { RemoteSnapshot } from "../core/types.js";
 
 /**
  * Options for the DefaultSyncService implementation.
@@ -36,7 +41,9 @@ export interface SyncServiceOptions {
  * of truth, discard local on conflicts/failures".
  */
 export class DefaultSyncService implements SyncService {
-  private readonly options: Required<Omit<SyncServiceOptions, "debug">> & { debug: boolean };
+  private readonly options: Required<Omit<SyncServiceOptions, "debug">> & {
+    debug: boolean;
+  };
 
   constructor(options: SyncServiceOptions) {
     this.options = {
@@ -90,10 +97,13 @@ export class DefaultSyncService implements SyncService {
 
         if (remoteSnapshot.commitId !== localState.snapshot.commitId) {
           // Remote has advanced, adopt remote state
-          this.debugLog("Remote advanced during initial load, adopting remote state", {
-            localCommitId: localState.snapshot.commitId,
-            remoteCommitId: remoteSnapshot.commitId,
-          });
+          this.debugLog(
+            "Remote advanced during initial load, adopting remote state",
+            {
+              localCommitId: localState.snapshot.commitId,
+              remoteCommitId: remoteSnapshot.commitId,
+            },
+          );
 
           await this.options.local.save(remoteSnapshot, {
             synced: true,
@@ -120,9 +130,15 @@ export class DefaultSyncService implements SyncService {
         return localState.snapshot;
       } catch (fetchError) {
         // Failed to fetch from remote, use local state
-        this.debugLog("Failed to fetch from remote during initial load, using local state", {
-          error: fetchError instanceof Error ? fetchError.message : String(fetchError),
-        });
+        this.debugLog(
+          "Failed to fetch from remote during initial load, using local state",
+          {
+            error:
+              fetchError instanceof Error
+                ? fetchError.message
+                : String(fetchError),
+          },
+        );
 
         if (localState.hasUnsyncedChanges) {
           this.debugLog("Warning: Using local state with unsynced changes");
@@ -135,7 +151,7 @@ export class DefaultSyncService implements SyncService {
         `Initial load failed: ${error instanceof Error ? error.message : String(error)}`,
         "INITIAL_LOAD_FAILED",
         error instanceof Error ? error : undefined,
-        "initial_load"
+        "initial_load",
       );
     }
   }
@@ -183,12 +199,13 @@ export class DefaultSyncService implements SyncService {
       // Remote hasn't advanced, try to push local changes
       try {
         const pushResult = await this.withRetry(
-          () => this.options.remote.pushSnapshot(localSnapshot.commitId, {
-            schemas: localSnapshot.schemas,
-            records: localSnapshot.records,
-            meta: localSnapshot.meta,
-          }),
-          "push"
+          () =>
+            this.options.remote.pushSnapshot(localSnapshot.commitId, {
+              schemas: localSnapshot.schemas,
+              records: localSnapshot.records,
+              meta: localSnapshot.meta,
+            }),
+          "push",
         );
 
         // Push succeeded - construct new snapshot
@@ -219,7 +236,8 @@ export class DefaultSyncService implements SyncService {
           snapshot: newSnapshot,
           meta: {
             previousCommitId: localSnapshot.commitId,
-            changesPushed: localSnapshot.schemas.length + localSnapshot.records.length,
+            changesPushed:
+              localSnapshot.schemas.length + localSnapshot.records.length,
             reason: "Local changes pushed successfully",
             duration: Date.now() - startTime,
           },
@@ -227,7 +245,8 @@ export class DefaultSyncService implements SyncService {
       } catch (pushError) {
         // Push failed - fetch latest remote and reset
         this.debugLog("Push failed, fetching latest remote", {
-          error: pushError instanceof Error ? pushError.message : String(pushError),
+          error:
+            pushError instanceof Error ? pushError.message : String(pushError),
         });
 
         const latestRemote = await this.options.remote.fetchSnapshot();
@@ -260,7 +279,7 @@ export class DefaultSyncService implements SyncService {
         `Sync failed: ${error instanceof Error ? error.message : String(error)}`,
         "SYNC_FAILED",
         error instanceof Error ? error : undefined,
-        "sync"
+        "sync",
       );
     }
   }
@@ -274,8 +293,9 @@ export class DefaultSyncService implements SyncService {
       // Check if we can reach remote
       await this.options.remote.ping?.();
 
+      // TODO: do we need this?
       // Check if we have local storage
-      const localState = await this.options.local.load();
+      // const localState = await this.options.local.load();
 
       return true;
     } catch (error) {
@@ -300,7 +320,7 @@ export class DefaultSyncService implements SyncService {
         `Failed to destroy sync service: ${error instanceof Error ? error.message : String(error)}`,
         "DESTROY_FAILED",
         error instanceof Error ? error : undefined,
-        "destroy"
+        "destroy",
       );
     }
   }
@@ -311,7 +331,7 @@ export class DefaultSyncService implements SyncService {
   private async withRetry<T>(
     operation: () => Promise<T>,
     operationName: string,
-    attempt = 1
+    attempt = 1,
   ): Promise<T> {
     try {
       return await operation();
@@ -343,7 +363,7 @@ export class DefaultSyncService implements SyncService {
    * Simple delay utility.
    */
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**

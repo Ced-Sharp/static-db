@@ -1,4 +1,9 @@
-import { RemoteSnapshot, SchemaDef, SchemaName, RecordId, EntityRecord } from "./types.js";
+import type {
+  EntityRecord,
+  RecordId,
+  RemoteSnapshot,
+  SchemaName,
+} from "./types.js";
 
 /**
  * Initialization options for a RemoteDatabase instance.
@@ -23,9 +28,6 @@ export interface RemoteDatabaseInitOptions {
 
   /** Optional branch or version to work with. */
   branch?: string;
-
-  /** Additional options for specific implementations. */
-  [key: string]: unknown;
 }
 
 /**

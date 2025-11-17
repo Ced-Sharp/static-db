@@ -22,7 +22,7 @@ export const FIELD_TYPES = {
   JSON: "json",
 } as const;
 
-export type FieldType = typeof FIELD_TYPES[keyof typeof FIELD_TYPES];
+export type FieldType = (typeof FIELD_TYPES)[keyof typeof FIELD_TYPES];
 
 /**
  * Field definition inside a schema.
@@ -157,14 +157,14 @@ export type RecordData<T extends SchemaDef> = {
   [K in T["fields"][number]["name"]]: T["fields"][number]["type"] extends "string"
     ? string
     : T["fields"][number]["type"] extends "number"
-    ? number
-    : T["fields"][number]["type"] extends "boolean"
-    ? boolean
-    : T["fields"][number]["type"] extends "date"
-    ? string // ISO date
-    : T["fields"][number]["type"] extends "relation"
-    ? RecordId | RecordId[]
-    : unknown;
+      ? number
+      : T["fields"][number]["type"] extends "boolean"
+        ? boolean
+        : T["fields"][number]["type"] extends "date"
+          ? string // ISO date
+          : T["fields"][number]["type"] extends "relation"
+            ? RecordId | RecordId[]
+            : unknown;
 };
 
 /**

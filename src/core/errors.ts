@@ -6,7 +6,7 @@
 /**
  * Base class for all Static DB errors.
  */
-export abstract class StaticDBError extends Error {
+export class StaticDBError extends Error {
   constructor(
     message: string,
     public readonly code: string,
@@ -39,7 +39,7 @@ export abstract class StaticDBError extends Error {
 /**
  * Base class for RemoteDatabase related errors.
  */
-export abstract class RemoteDatabaseError extends StaticDBError {
+export class RemoteDatabaseError extends StaticDBError {
   constructor(
     message: string,
     code: string,
@@ -76,7 +76,10 @@ export class OutOfDateError extends RemoteDatabaseError {
  * Authentication or authorization failure with remote backend.
  */
 export class AuthenticationError extends RemoteDatabaseError {
-  constructor(message: string = "Authentication failed", public readonly endpoint?: string) {
+  constructor(
+    message: string = "Authentication failed",
+    public readonly endpoint?: string,
+  ) {
     super(message, "AUTHENTICATION_FAILED");
   }
 
@@ -126,11 +129,7 @@ export class RemoteConfigurationError extends RemoteDatabaseError {
 /**
  * Base class for LocalDatabase related errors.
  */
-export abstract class LocalDatabaseError extends StaticDBError {
-  constructor(message: string, code: string, cause?: Error) {
-    super(message, code, cause);
-  }
-}
+export class LocalDatabaseError extends StaticDBError {}
 
 /**
  * Quota exceeded or storage full error.
@@ -170,7 +169,10 @@ export class StorageUnavailableError extends LocalDatabaseError {
  * Data corruption or validation errors in local storage.
  */
 export class DataCorruptionError extends LocalDatabaseError {
-  constructor(message: string = "Local data corruption detected", cause?: Error) {
+  constructor(
+    message: string = "Local data corruption detected",
+    cause?: Error,
+  ) {
     super(message, "DATA_CORRUPTION", cause);
   }
 
@@ -186,7 +188,7 @@ export class DataCorruptionError extends LocalDatabaseError {
 /**
  * Base class for SyncService related errors.
  */
-export abstract class SyncError extends StaticDBError {
+export class SyncError extends StaticDBError {
   constructor(
     message: string,
     code: string,
@@ -195,13 +197,21 @@ export abstract class SyncError extends StaticDBError {
   ) {
     super(message, code, cause);
   }
+
+  override isRetryable(): boolean {
+    return true;
+  }
 }
 
 /**
  * Sync failed due to unrecoverable error.
  */
 export class SyncFailedError extends SyncError {
-  constructor(message: string = "Sync operation failed", cause?: Error, phase?: string) {
+  constructor(
+    message: string = "Sync operation failed",
+    cause?: Error,
+    phase?: string,
+  ) {
     super(message, "SYNC_FAILED", cause, phase);
   }
 
@@ -263,7 +273,7 @@ export class SchemaValidationError extends ValidationError {
  */
 export function isErrorOfType<T extends StaticDBError>(
   error: unknown,
-  errorClass: new (...args: any[]) => T,
+  errorClass: new (...args: unknown[]) => T,
 ): error is T {
   return error instanceof errorClass;
 }
@@ -293,13 +303,20 @@ export function getUserErrorMessage(error: unknown): string {
 /**
  * Utility function to wrap unknown errors in a StaticDBError.
  */
-export function wrapError(error: unknown, message: string = "Unknown error occurred"): StaticDBError {
+export function wrapError(
+  error: unknown,
+  message: string = "Unknown error occurred",
+): StaticDBError {
   if (error instanceof StaticDBError) {
     return error;
   }
 
   if (error instanceof Error) {
-    return new SyncError(`${message}: ${error.message}`, "UNKNOWN_ERROR", error);
+    return new SyncError(
+      `${message}: ${error.message}`,
+      "UNKNOWN_ERROR",
+      error,
+    );
   }
 
   return new SyncError(message, "UNKNOWN_ERROR");
