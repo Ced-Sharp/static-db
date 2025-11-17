@@ -1,10 +1,40 @@
-// Node/Bun adapter. Exposes core utilities and Node-specific helpers.
-export { add, getRandomId, greet } from "./internal";
+/**
+ * Static DB - Git-Backed Local-First CMS Data Layer
+ *
+ * Node.js entry point with full API access including Node-specific functionality.
+ */
 
-import { randomBytes } from "node:crypto";
+// Core types and interfaces
+export * from "./core/types.js";
+export * from "./core/interfaces.js";
+export * from "./core/errors.js";
 
-export function getSecureRandomId(): string {
-  const timePart = Date.now().toString(36);
-  const bytes = randomBytes(12).toString("base64url");
-  return `${timePart}-${bytes}`;
-}
+// Remote database implementations
+export * from "./remote/base.js";
+export * from "./remote/github.js";
+
+// Local database implementations
+export * from "./local/indexeddb.js";
+export * from "./local/memory.js";
+
+// Sync service
+export * from "./sync/service.js";
+
+// Utilities
+export * from "./utils/validation.js";
+
+/**
+ * Version information for the Static DB library.
+ */
+export const VERSION = "1.0.0";
+
+/**
+ * Library metadata.
+ */
+export const LIB_INFO = {
+  name: "static-db",
+  version: VERSION,
+  description: "Git-Backed Local-First CMS Data Layer",
+  repository: "https://github.com/your-org/static-db",
+  documentation: "https://your-org.github.io/static-db",
+} as const;
