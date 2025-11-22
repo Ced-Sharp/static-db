@@ -10,6 +10,7 @@ import {
   GitHubRemoteDatabase,
   type GitHubRemoteDatabaseOptions,
 } from "../../src/remote/github";
+import { GitHubFile, GitHubFileSystem } from "../github_utils";
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -21,6 +22,7 @@ describe("GitHubRemoteDatabase", () => {
     repo: "testrepo",
     token: "test-token",
     branch: "main",
+    baseDir: "test-directory",
     schemasDir: "schemas",
     contentDir: "content",
   };
@@ -151,119 +153,115 @@ describe("GitHubRemoteDatabase", () => {
     });
 
     it("fetches snapshot with schemas and records", async () => {
-      // Mock ref request
-      mockFetch
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({
-            object: { sha: "abc123def456" },
+      const commitId = "abc123def456";
+      const branch = defaultOptions.branch ?? "main";
+      const baseDir = defaultOptions.baseDir ?? "";
+      const schemas = "test-directory/schemas";
+      const content = "test-directory/content";
+
+      GitHubFile.RepoOwner = defaultOptions.owner;
+      GitHubFile.RepoName = defaultOptions.repo;
+      GitHubFile.RepoBranch = branch;
+
+      const gitFiles = new GitHubFileSystem(baseDir, [
+        new GitHubFileSystem(baseDir + "/schemas", [
+          new GitHubFileSystem(baseDir + "/schemas/.gitkeep"),
+          new GitHubFileSystem(baseDir + "/schemas/pages.json").withJson({
+            id: "pages",
+            name: "Pages",
+            fields: [],
           }),
-        })
-        // Mock schemas directory request
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => [
-            { name: "product.json", type: "file" },
-            { name: "category.json", type: "file" },
-          ],
-        })
-        // Mock schema file requests
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({
-            content: Buffer.from(
-              JSON.stringify({
-                name: "product",
-                fields: [
-                  { name: "title", type: "string", required: true },
-                  { name: "price", type: "number", required: true },
-                ],
-              }),
-            ).toString("base64"),
+          new GitHubFileSystem(baseDir + "/schemas/projects.json").withJson({
+            id: "projects",
+            name: "Projects",
+            fields: [],
           }),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({
-            content: Buffer.from(
-              JSON.stringify({
-                name: "category",
-                fields: [{ name: "name", type: "string", required: true }],
-              }),
-            ).toString("base64"),
-          }),
-        })
-        // Mock content directory request
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => [
-            { name: "product", type: "dir" },
-            { name: "category", type: "dir" },
-          ],
-        })
-        // Mock subdirectory requests
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => [
-            { name: "prod-1.json", type: "file" },
-            { name: "prod-2.json", type: "file" },
-          ],
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => [{ name: "cat-1.json", type: "file" }],
-        })
-        // Mock record file requests
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({
-            content: Buffer.from(
-              JSON.stringify({
-                id: "prod-1",
-                schema: "product",
-                data: { title: "Test Product 1", price: 29.99 },
-                createdAt: "2023-01-01T00:00:00.000Z",
-                updatedAt: "2023-01-01T00:00:00.000Z",
-              }),
-            ).toString("base64"),
-          }),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({
-            content: Buffer.from(
-              JSON.stringify({
-                id: "prod-2",
-                schema: "product",
-                data: { title: "Test Product 2", price: 39.99 },
-                createdAt: "2023-01-01T00:00:00.000Z",
-                updatedAt: "2023-01-01T00:00:00.000Z",
-              }),
-            ).toString("base64"),
-          }),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({
-            content: Buffer.from(
-              JSON.stringify({
-                id: "cat-1",
-                schema: "category",
-                data: { name: "Test Category" },
-                createdAt: "2023-01-01T00:00:00.000Z",
-                updatedAt: "2023-01-01T00:00:00.000Z",
-              }),
-            ).toString("base64"),
-          }),
-        });
+        ]),
+        new GitHubFileSystem(baseDir + "/content", [
+          new GitHubFileSystem(baseDir + "/content/.gitkeep"),
+          new GitHubFileSystem(baseDir + "/content/pages.json").withJson([
+            { id: "page-1", name: "Page One" },
+            { id: "page-2", name: "Page Two" },
+            { id: "page-3", name: "Page Three" },
+          ]),
+          new GitHubFileSystem(baseDir + "/content/projects.json").withJson([
+            { id: "project-1", name: "Project One" },
+            { id: "project-2", name: "Project Two" },
+            { id: "project-3", name: "Project Three" },
+          ]),
+          new GitHubFileSystem(baseDir + "/content/test.json").withJson([]),
+        ]),
+      ]);
+
+      // Fake GitHub results
+      mockFetch.mockImplementation((url: RequestInfo, options: RequestInit) => {
+        switch (true) {
+          // Retrieving commit sha
+          case url.toString().includes("/git/ref/heads/"):
+            return {
+              ok: true,
+              json: async () => ({ object: { sha: commitId } }),
+            };
+
+          // Retrieve schema content
+          case url.toString().endsWith(`contents/${schemas}?ref=${branch}`):
+            return {
+              ok: true,
+              json: async () =>
+                gitFiles
+                  .cd("schemas")
+                  .files()
+                  .map((f) => f.toJson()),
+            };
+
+          case url.toString().endsWith(`contents/${content}?ref=${branch}`):
+            return {
+              ok: true,
+              json: async () =>
+                gitFiles
+                  .cd("content")
+                  .files()
+                  .map((f) => f.toJson()),
+            };
+
+          case url.toString().includes(`contents/${schemas}`) &&
+            url.toString().endsWith(".json?ref=main"): {
+            const file =
+              url.toString().split("/").pop()?.split("?").shift() ?? "-error-";
+            return {
+              ok: true,
+              json: async () => gitFiles.cd("schemas").cd(file).toJson(),
+            };
+          }
+
+          case url.toString().includes(`contents/${content}`) &&
+            url.toString().endsWith(".json?ref=main"): {
+            const file =
+              url.toString().split("/").pop()?.split("?").shift() ?? "-error-";
+            return {
+              ok: true,
+              json: async () => gitFiles.cd("content").cd(file).toJson(),
+            };
+          }
+
+          default:
+            console.warn(`Calling: '${url}'\n\nNOT IMPLEMENTED`);
+            return {
+              ok: false,
+              status_code: 500,
+              text: async () => "NOT IMPLEMENTED",
+              json: async () => ({ reason: "NOT IMPLEMENTED" }),
+            };
+        }
+      });
 
       const snapshot = await db.fetchSnapshot();
 
-      expect(snapshot.commitId).toBe("abc123def456");
+      expect(snapshot.commitId).toBe(commitId);
       expect(snapshot.schemas).toHaveLength(2);
       expect(snapshot.records).toHaveLength(3);
-      expect(snapshot.schemas[0].name).toBe("product");
-      expect(snapshot.schemas[1].name).toBe("category");
+      expect(snapshot.schemas[0].name).toBe("Pages");
+      expect(snapshot.schemas[1].name).toBe("Projects");
       expect(snapshot.meta?.fetchedAt).toBeDefined();
       expect(snapshot.meta?.size?.schemasCount).toBe(2);
       expect(snapshot.meta?.size?.recordsCount).toBe(3);
@@ -402,7 +400,9 @@ describe("GitHubRemoteDatabase", () => {
       const result = await db.pushSnapshot("base123", testSnapshot);
 
       expect(result.newCommitId).toBe("commit789");
-      expect(mockFetch).toHaveBeenCalledTimes(4);
+
+      // 4 request + db init ping = 5 times
+      expect(mockFetch).toHaveBeenCalledTimes(5);
     });
 
     it("handles out-of-date error", async () => {

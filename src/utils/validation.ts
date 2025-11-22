@@ -21,6 +21,15 @@ export interface ValidationResult {
   warnings: string[];
 }
 
+const FIELD_TYPES = [
+  "string",
+  "number",
+  "boolean",
+  "date",
+  "media",
+  "relation",
+];
+
 /**
  * Validator for CMS schemas and records.
  */
@@ -137,6 +146,7 @@ export class CMSValidator {
 
     const fieldObj = field as Record<string, unknown>;
 
+    // Ensure name is a set and a string
     if (!fieldObj.name || typeof fieldObj.name !== "string") {
       errors.push(
         new ValidationError(
@@ -147,17 +157,7 @@ export class CMSValidator {
       );
     }
 
-    if (!fieldObj.type || typeof fieldObj.type !== "string") {
-      errors.push(
-        new ValidationError(
-          "Field type is required and must be a string",
-          "type",
-          field,
-        ),
-      );
-    }
-
-    // Validate field name format
+    // Ensure name starts with letter, and contains letter, numbers, or underscore
     if (fieldObj.name && typeof fieldObj.name === "string") {
       if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(fieldObj.name)) {
         errors.push(
@@ -174,6 +174,26 @@ export class CMSValidator {
           `Field name '${fieldObj.name}' starts with underscore (reserved for system fields)`,
         );
       }
+    }
+
+    if (!fieldObj.type || typeof fieldObj.type !== "string") {
+      errors.push(
+        new ValidationError(
+          "Field type is required and must be a string",
+          "type",
+          field,
+        ),
+      );
+    }
+
+    if (!FIELD_TYPES.includes(fieldObj.type as string)) {
+      errors.push(
+        new ValidationError(
+          `Field name '${fieldObj.name}' of type '${fieldObj.type}' is not a supported field type.`,
+          "name",
+          field,
+        ),
+      );
     }
 
     // Validate relation fields
@@ -279,7 +299,9 @@ export class CMSValidator {
     );
 
     if (unknownFields.length > 0) {
-      warnings.push(`Unknown fields: ${unknownFields.join(", ")}`);
+      for (const unknownField of unknownFields) {
+        warnings.push(`Unknown field '${unknownField}'.`);
+      }
     }
 
     // Validate timestamps
@@ -619,10 +641,16 @@ export function validateSnapshot(
   records: EntityRecord[],
 ): ValidationResult {
   const validator = new CMSValidator();
-  validator.registerSchemas(schemas);
-
   const allErrors: ValidationError[] = [];
   const allWarnings: string[] = [];
+
+  try {
+    validator.registerSchemas(schemas);
+  } catch (error) {
+    if (error instanceof SchemaValidationError) {
+      allErrors.push(error);
+    }
+  }
 
   // Validate all schemas
   for (const schema of schemas) {

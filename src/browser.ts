@@ -35,14 +35,14 @@ export const BROWSER_UTILS = {
    * Check if IndexedDB is available in the current environment.
    */
   isIndexedDBAvailable(): boolean {
-    return "indexedDB" in self && indexedDB !== null;
+    return "indexedDB" in globalThis && indexedDB !== null;
   },
 
   /**
    * Check if the current environment supports Web Crypto API.
    */
   isCryptoAvailable(): boolean {
-    return "crypto" in self && crypto.subtle !== undefined;
+    return "crypto" in globalThis && crypto.subtle !== undefined;
   },
 
   /**
@@ -53,7 +53,11 @@ export const BROWSER_UTILS = {
     usage?: number;
     available?: boolean;
   }> {
-    if ("storage" in navigator && "estimate" in navigator.storage) {
+    if (
+      "navigator" in globalThis &&
+      "storage" in navigator &&
+      "estimate" in navigator.storage
+    ) {
       try {
         const estimate = await navigator.storage.estimate();
         return {
@@ -72,7 +76,11 @@ export const BROWSER_UTILS = {
    * Request persistent storage if available (important for CMS data).
    */
   async requestPersistentStorage(): Promise<boolean> {
-    if ("storage" in navigator && "persist" in navigator.storage) {
+    if (
+      "navigator" in globalThis &&
+      "storage" in navigator &&
+      "persist" in navigator.storage
+    ) {
       try {
         return await navigator.storage.persist();
       } catch {

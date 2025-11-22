@@ -293,9 +293,8 @@ export class DefaultSyncService implements SyncService {
       // Check if we can reach remote
       await this.options.remote.ping?.();
 
-      // TODO: do we need this?
       // Check if we have local storage
-      // const localState = await this.options.local.load();
+      await this.options.local.load();
 
       return true;
     } catch (error) {

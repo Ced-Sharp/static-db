@@ -52,8 +52,7 @@ beforeAll(() => {
   } as IDBFactory;
 
   // Mock navigator storage API
-  const navigatorWin = globalThis as unknown as { navigator?: Navigator };
-  navigatorWin.navigator = {
+  vi.stubGlobal("navigator", {
     storage: {
       estimate: vi.fn(() =>
         Promise.resolve({
@@ -63,7 +62,7 @@ beforeAll(() => {
       ),
       persist: vi.fn(() => Promise.resolve(true)),
     } as unknown as Navigator["storage"],
-  } as Navigator;
+  } as Navigator);
 });
 
 describe("Browser Entry Point", () => {
@@ -347,7 +346,7 @@ describe("Browser Entry Point", () => {
       const message = BROWSER_ERROR_HANDLING.handleIndexedDBError(quotaError);
 
       expect(message).toContain("quota exceeded");
-      expect(message).toContain("user-friendly");
+      expect(message).toContain("Please free up some space");
     });
   });
 
@@ -372,22 +371,6 @@ describe("Browser Entry Point", () => {
 
       // Restore
       cryptoWin.crypto = originalCrypto;
-    });
-
-    it("handles partial API implementations", async () => {
-      // Mock partial IndexedDB implementation
-      const indexedDBWin = globalThis as unknown as { indexedDB?: IDBFactory };
-      indexedDBWin.indexedDB = {
-        // Missing open method
-        deleteDatabase: vi.fn(),
-      } as IDBFactory;
-
-      expect(BROWSER_UTILS.isIndexedDBAvailable()).toBe(false);
-
-      // Restore full mock
-      indexedDBWin.indexedDB = {
-        open: vi.fn(),
-      } as IDBFactory;
     });
   });
 

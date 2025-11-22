@@ -179,8 +179,8 @@ describe("NodeFileLocalDatabase", () => {
       const snapshotPath = join(tempDir, "snapshot.json");
       const metadataPath = join(tempDir, "metadata.json");
 
-      await expect(fs.access(snapshotPath)).resolves.toBeUndefined();
-      await expect(fs.access(metadataPath)).resolves.toBeUndefined();
+      await expect(fs.access(snapshotPath)).resolves.toBeFalsy();
+      await expect(fs.access(metadataPath)).resolves.toBeFalsy();
 
       // Verify content
       const snapshotData = await fs.readFile(snapshotPath, "utf-8");
@@ -241,7 +241,7 @@ describe("NodeFileLocalDatabase", () => {
       // Files should exist
       await expect(
         fs.access(join(nestedDir, "snapshot.json")),
-      ).resolves.toBeUndefined();
+      ).resolves.toBeFalsy();
     });
   });
 
@@ -289,7 +289,7 @@ describe("NodeFileLocalDatabase", () => {
       // Files should still exist after destroy (only connection is destroyed)
       await expect(
         fs.access(join(tempDir, "snapshot.json")),
-      ).resolves.toBeUndefined();
+      ).resolves.toBeFalsy();
     });
   });
 
@@ -314,10 +314,10 @@ describe("NodeFileLocalDatabase", () => {
       // Should use custom file names
       await expect(
         fs.access(join(tempDir, "custom-snapshot.json")),
-      ).resolves.toBeUndefined();
+      ).resolves.toBeFalsy();
       await expect(
         fs.access(join(tempDir, "custom-metadata.json")),
-      ).resolves.toBeUndefined();
+      ).resolves.toBeFalsy();
 
       await expect(fs.access(join(tempDir, "snapshot.json"))).rejects.toThrow();
       await expect(fs.access(join(tempDir, "metadata.json"))).rejects.toThrow();

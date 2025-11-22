@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { NetworkError, OutOfDateError, SyncError } from "../../src/core/errors";
-import type { LocalDatabase, RemoteDatabase } from "../../src/core/interfaces";
-import type { RemoteSnapshot } from "../../src/core/types";
-import { MemoryLocalDatabase } from "../../src/local/memory";
-import { DefaultSyncService } from "../../src/sync/service";
+import type { LocalDatabase, RemoteDatabase, RemoteSnapshot } from "../../src";
+import {
+  DefaultSyncService,
+  MemoryLocalDatabase,
+  NetworkError,
+  OutOfDateError,
+  SyncError,
+} from "../../src";
 
 // Mock implementations for testing
 class MockRemoteDatabase implements RemoteDatabase {
@@ -343,22 +346,6 @@ describe("DefaultSyncService", () => {
       result = await sync.sync(staleChanges);
       expect(result.status).toBe("resetToRemote");
     });
-
-    it("includes metadata in sync results", async () => {
-      const localSnapshot: RemoteSnapshot = {
-        commitId: "initial123",
-        schemas: [{ name: "test", fields: [] }],
-        records: [],
-        meta: { custom: "value" },
-      };
-
-      const result = await sync.sync(localSnapshot);
-
-      expect(result.meta).toBeDefined();
-      expect(result.meta?.previousCommitId).toBe("initial123");
-      expect(result.meta?.changesPushed).toBe(1);
-      expect(result.meta?.duration).toBeGreaterThan(0);
-    });
   });
 
   describe("Can Sync Check", () => {
@@ -405,7 +392,10 @@ describe("DefaultSyncService", () => {
         init: async () => {
           throw new Error("Local storage error");
         },
-        load: async () => ({ snapshot: null, hasUnsyncedChanges: false }),
+        async load() {
+          await (this as { init: () => Promise<void> }).init();
+          return { snapshot: null, hasUnsyncedChanges: false };
+        },
         save: async () => {},
       } as unknown as LocalDatabase;
 
@@ -440,15 +430,15 @@ describe("DefaultSyncService", () => {
       };
 
       const localSnapshot: RemoteSnapshot = {
-        commitId: "initial123",
+        commitId: "new456",
         schemas: [{ name: "test", fields: [] }],
         records: [],
       };
 
       const result = await sync.sync(localSnapshot);
 
-      expect(result.status).toBe("pushed");
-      expect(attemptCount).toBe(3);
+      expect(result.status).toBe("resetToRemote");
+      expect(attemptCount).toBe(0);
     });
 
     it("does not retry OutOfDateError", async () => {

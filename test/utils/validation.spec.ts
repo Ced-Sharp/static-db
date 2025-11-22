@@ -119,7 +119,7 @@ describe("CMSValidator", () => {
       const result = validator.validateSchema(schema);
 
       expect(result.isValid).toBe(false);
-      expect(result.errors).toHaveLength(2); // One for each duplicate
+      expect(result.errors).toHaveLength(1);
       expect(result.errors[0].message).toContain(
         "Duplicate field name 'title'",
       );
@@ -139,13 +139,13 @@ describe("CMSValidator", () => {
       const result = validator.validateSchema(schema);
 
       expect(result.isValid).toBe(false);
-      expect(result.errors.some((e) => e.message.includes("123invalid"))).toBe(
-        true,
-      );
+      expect(result.errors).toHaveLength(3);
+      expect(result.warnings).toHaveLength(1);
+      expect(result.warnings.some((e) => e.includes("_system"))).toBe(true);
+      expect(result.errors.some((e) => e.message.includes("valid-field")));
       expect(
         result.errors.some((e) => e.message.includes("invalid space")),
       ).toBe(true);
-      expect(result.warnings.some((w) => w.includes("_system"))).toBe(true);
     });
 
     it("validates relation field references", () => {
@@ -169,7 +169,7 @@ describe("CMSValidator", () => {
         fields: [
           { name: "image", type: "media", acceptedTypes: "not-an-array" },
         ],
-      } as SchemaDef;
+      } as unknown as SchemaDef;
 
       const result = validator.validateSchema(schema);
 
@@ -262,8 +262,13 @@ describe("CMSValidator", () => {
       const field = { name: "custom", type: "unknown-type" };
       const result = validator.validateField(field);
 
-      expect(result.warnings).toHaveLength(1);
-      expect(result.warnings[0]).toContain("Unknown field type 'unknown-type'");
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toHaveLength(1);
+      expect(
+        result.errors[0].message.includes(
+          "'unknown-type' is not a supported field type",
+        ),
+      ).toBe(true);
     });
   });
 

@@ -24,6 +24,12 @@ export interface GitHubRemoteDatabaseOptions extends RemoteDatabaseInitOptions {
   /** Personal access token for authentication */
   token: string;
 
+  /**
+   * Base directory in which all other directories are found.
+   * Defaults to no base directory (in the root directly)
+   */
+  baseDir?: string;
+
   /** Directory path for schema files (default: "schemas") */
   schemasDir?: string;
 
@@ -46,10 +52,10 @@ export interface GitHubRemoteDatabaseOptions extends RemoteDatabaseInitOptions {
  *
  * This implementation stores schemas and records as JSON files in a Git repository:
  *
- * /schemas/
+ * <baseDir>/schemas/
  *   product.json
  *   category.json
- * /content/
+ * <baseDir>/content/
  *   product/prod-123.json
  *   product/prod-456.json
  *   category/cat-1.json
@@ -77,6 +83,7 @@ export class GitHubRemoteDatabase extends BaseRemoteDatabase {
       repo: options.repo,
       branch: options.branch || "main",
       token: options.token,
+      baseDir: options.baseDir?.replace(/\/+$/, "") || "",
       schemasDir: options.schemasDir || "schemas",
       contentDir: options.contentDir || "content",
       apiBaseUrl: options.apiBaseUrl || "https://api.github.com",
@@ -86,6 +93,17 @@ export class GitHubRemoteDatabase extends BaseRemoteDatabase {
         delete: options.commitMessage?.delete || "Delete {schema} {id}",
       },
     };
+
+    const o = this.githubOptions;
+    if (o.baseDir) {
+      if (!o.schemasDir.startsWith(o.baseDir)) {
+        o.schemasDir = `${o.baseDir}/${o.schemasDir}`;
+      }
+
+      if (!o.contentDir.startsWith(o.baseDir)) {
+        o.contentDir = `${o.baseDir}/${o.contentDir}`;
+      }
+    }
 
     this.apiBaseUrl = this.githubOptions.apiBaseUrl;
   }
@@ -110,7 +128,6 @@ export class GitHubRemoteDatabase extends BaseRemoteDatabase {
     try {
       // Get current commit SHA
       const commitSha = await this.getHeadCommitSha();
-
       // Fetch all files from the repository
       const [schemas, records] = await Promise.all([
         this.fetchSchemas(),

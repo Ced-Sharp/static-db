@@ -7,7 +7,7 @@ import {
   it,
   vi,
 } from "vitest";
-import type { RemoteSnapshot } from "../../src/core/types";
+import type { RemoteSnapshot } from "../../src";
 import {
   IndexedDBLocalDatabase,
   type IndexedDBLocalDatabaseOptions,
@@ -170,13 +170,8 @@ describe.sequential("IndexedDBLocalDatabase", () => {
       // Simulate successful loads
       setTimeout(() => {
         const snapshotRequest = mockObjectStore.get.mock.results[0].value;
-        const metaRequest = mockObjectStore.get.mock.results[1].value;
-
         if (snapshotRequest.onsuccess) {
           snapshotRequest.onsuccess({ target: snapshotRequest });
-        }
-        if (metaRequest.onsuccess) {
-          metaRequest.onsuccess({ target: metaRequest });
         }
       }, 0);
 
@@ -238,8 +233,8 @@ describe.sequential("IndexedDBLocalDatabase", () => {
       mockObjectStore.get.mockImplementation(() => {
         const request = {
           result: { id: "current", snapshot: "invalid-data" },
-          onsuccess: null,
-          onerror: null,
+          onsuccess: null as ((...args: unknown[]) => void) | null,
+          onerror: null as ((...args: unknown[]) => void) | null,
         };
 
         setTimeout(() => {
@@ -325,8 +320,8 @@ describe.sequential("IndexedDBLocalDatabase", () => {
       mockObjectStore.put.mockImplementation(() => {
         const request = {
           error: new Error("Quota exceeded"),
-          onsuccess: null,
-          onerror: null,
+          onsuccess: null as ((...args: unknown[]) => void) | null,
+          onerror: null as ((...args: unknown[]) => void) | null,
         };
         setTimeout(() => {
           if (request.onerror) request.onerror({ target: request });
